@@ -1,8 +1,37 @@
 {
   "version": 2,
-  "dgSpecHash": "6YNSzUwLS8WfQZyAG+FL1RZOFJcGiL+92x6gCKH0pPuoX/ZZazvFwpTZcGyXqMY/6MvO4UajT+gv9ajPoO5R3w==",
-  "success": true,
-  "projectFilePath": "/Users/lengoctuyen/Documents/GitHub/Websocket-_-Remove-Control-System/Server/Server.csproj",
-  "expectedPackageFiles": [],
-  "logs": []
+  "dgSpecHash": "AJbwCZ0oas+tjpAQxzSFAizDjQdRi15C4R8/Sqg3v1RDa1HnHW9udKfag40Y5FBSOD6VTxPX7WOc68oMR+6dsw==",
+  "success": false,
+  "projectFilePath": "/Users/lengoctuyen/Documents/Allmyproject/Websocket-_-Remove-Control-System/Server/Server.csproj",
+  "expectedPackageFiles": [
+    "/Users/lengoctuyen/.nuget/packages/microsoft.netcore.platforms/5.0.0/microsoft.netcore.platforms.5.0.0.nupkg.sha512",
+    "/Users/lengoctuyen/.nuget/packages/microsoft.win32.registry/5.0.0/microsoft.win32.registry.5.0.0.nupkg.sha512",
+    "/Users/lengoctuyen/.nuget/packages/opencvsharp4/4.8.0.20230708/opencvsharp4.4.8.0.20230708.nupkg.sha512",
+    "/Users/lengoctuyen/.nuget/packages/opencvsharp4.runtime.win/4.8.0.20230708/opencvsharp4.runtime.win.4.8.0.20230708.nupkg.sha512",
+    "/Users/lengoctuyen/.nuget/packages/sharphook/5.3.0/sharphook.5.3.0.nupkg.sha512",
+    "/Users/lengoctuyen/.nuget/packages/system.memory/4.5.5/system.memory.4.5.5.nupkg.sha512",
+    "/Users/lengoctuyen/.nuget/packages/system.runtime.compilerservices.unsafe/6.0.0/system.runtime.compilerservices.unsafe.6.0.0.nupkg.sha512",
+    "/Users/lengoctuyen/.nuget/packages/system.security.accesscontrol/5.0.0/system.security.accesscontrol.5.0.0.nupkg.sha512",
+    "/Users/lengoctuyen/.nuget/packages/system.security.principal.windows/5.0.0/system.security.principal.windows.5.0.0.nupkg.sha512"
+  ],
+  "logs": [
+    {
+      "code": "NU1101",
+      "level": "Error",
+      "message": "Unable to find package SharpHook.Native. No packages exist with this id in source(s): /usr/local/share/dotnet/library-packs, nuget.org",
+      "libraryId": "SharpHook.Native",
+      "targetGraphs": [
+        "net7.0"
+      ]
+    },
+    {
+      "code": "NU1101",
+      "level": "Error",
+      "message": "Unable to find package OpenCvSharp4.runtime.osx. No packages exist with this id in source(s): /usr/local/share/dotnet/library-packs, nuget.org",
+      "libraryId": "OpenCvSharp4.runtime.osx",
+      "targetGraphs": [
+        "net7.0"
+      ]
+    }
+  ]
 }

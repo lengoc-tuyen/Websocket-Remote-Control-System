@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "/Users/lengoctuyen/Documents/GitHub/Websocket-_-Remove-Control-System/Server/Server.csproj": {}
+    "/Users/lengoctuyen/Documents/Allmyproject/Websocket-_-Remove-Control-System/Server/Server.csproj": {}
   },
   "projects": {
-    "/Users/lengoctuyen/Documents/GitHub/Websocket-_-Remove-Control-System/Server/Server.csproj": {
+    "/Users/lengoctuyen/Documents/Allmyproject/Websocket-_-Remove-Control-System/Server/Server.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "/Users/lengoctuyen/Documents/GitHub/Websocket-_-Remove-Control-System/Server/Server.csproj",
+        "projectUniqueName": "/Users/lengoctuyen/Documents/Allmyproject/Websocket-_-Remove-Control-System/Server/Server.csproj",
         "projectName": "Server",
-        "projectPath": "/Users/lengoctuyen/Documents/GitHub/Websocket-_-Remove-Control-System/Server/Server.csproj",
+        "projectPath": "/Users/lengoctuyen/Documents/Allmyproject/Websocket-_-Remove-Control-System/Server/Server.csproj",
         "packagesPath": "/Users/lengoctuyen/.nuget/packages/",
-        "outputPath": "/Users/lengoctuyen/Documents/GitHub/Websocket-_-Remove-Control-System/Server/obj/",
+        "outputPath": "/Users/lengoctuyen/Documents/Allmyproject/Websocket-_-Remove-Control-System/Server/obj/",
         "projectStyle": "PackageReference",
         "configFilePaths": [
           "/Users/lengoctuyen/.nuget/NuGet/NuGet.Config"
@@ -38,6 +38,32 @@
       "frameworks": {
         "net7.0": {
           "targetAlias": "net7.0",
+          "dependencies": {
+            "Microsoft.Win32.Registry": {
+              "target": "Package",
+              "version": "[5.0.0, )"
+            },
+            "OpenCvSharp4": {
+              "target": "Package",
+              "version": "[4.8.0.20230708, )"
+            },
+            "OpenCvSharp4.runtime.osx": {
+              "target": "Package",
+              "version": "[4.8.0.20230708, )"
+            },
+            "OpenCvSharp4.runtime.win": {
+              "target": "Package",
+              "version": "[4.8.0.20230708, )"
+            },
+            "SharpHook": {
+              "target": "Package",
+              "version": "[5.3.0, )"
+            },
+            "SharpHook.Native": {
+              "target": "Package",
+              "version": "[5.3.0, )"
+            }
+          },
           "imports": [
             "net461",
             "net462",
