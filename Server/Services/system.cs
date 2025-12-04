@@ -12,6 +12,7 @@ namespace Server.Services
     public class SystemService
     {
 
+        // hàm này liệt kê tiến trình hoặc app (2 hàm kế ở dưới hỗ trợ)
         public List<ProcessInfo> ListRunningProcesses(bool isAppOnly = false)
         {
             List<ProcessInfo> list = new List<ProcessInfo>(); // 1 danh sách để chứa cái tiến trình
@@ -109,6 +110,128 @@ namespace Server.Services
             process.WaitForExit();
             return result;
         }
+
+        // Start process hoặc app
+        public bool StartProcess(string processPath)
+        {
+            if (string.IsNullOrEmpty(processPath)) return false;
+
+            string baseName = Path.GetFileNameWithoutExtension(processPath);
+
+            if (Process.GetProcessesByName(baseName).Length > 0)
+            {
+                Console.WriteLine($"Process {processPath} is already running. Skipping new instance.");
+                return false; 
+            }
+            
+            try
+            {
+                Process.Start(processPath); 
+                return true;
+            }
+            catch (Exception ex)
+            {
+                if (IsOSPlatform(OSPlatform.Windows) && !processPath.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
+                {
+                    try
+                    {
+                        string exePath = processPath + ".exe";
+                        Process.Start(exePath);
+                        return true;
+                    }
+                    catch (Exception innerEx)
+                    {
+                        Console.WriteLine($"Error starting process {processPath}.exe: {innerEx.Message}");
+                    }
+                }
+                else if (IsOSPlatform(OSPlatform.OSX))
+                {
+                    try
+                    {
+                        string command = $"open -a \"{processPath}\"";
+                        ExecuteShellCommand(command, "sh"); 
+                        return true;
+                    }
+                    catch(Exception innerEx)
+                    {
+                        Console.WriteLine($"Error starting process {processPath} on OSX: {innerEx.Message}");
+                    }
+                }
+                
+                Console.WriteLine($"Error starting process {processPath}: {ex.Message}");
+                return false;
+            }
+        }
+
+        // Hàm này stop app, process
+        public bool KillProcessById(int processId)
+        {
+            try
+            {
+                Process p = Process.GetProcessById(processId);
+                
+                if (p != null)
+                {
+                    if (!p.CloseMainWindow())
+                    {
+                        p.Kill(); // đóng bình thường ko được thì ép  nó đóng
+                    }
+                    p.WaitForExit(1000);
+                    return true;
+                }
+                return false;
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+        }
+
+
+        // Hàm này để restart, shutdown  máy 
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern bool ExitWindowsEx(uint uFlags, uint dwReason);
+
+        private const uint EWX_SHUTDOWN = 0x00000008; // Tắt máy
+        private const uint EWX_REBOOT = 0x00000002;   // Khởi động lại
+        private const uint EWX_FORCE = 0x00000004;    // Nếu tiến trình nào cứng đầu quá thì buộc dừng
+
+        public bool ShutdownComputer(bool isRestart)
+        {
+            if (IsOSPlatform(OSPlatform.Windows))
+            {
+                uint flag = isRestart ? EWX_REBOOT : EWX_SHUTDOWN;
+                try
+                {
+                    return ExitWindowsEx(flag | EWX_FORCE, 0); 
+                }
+                catch (Exception ex) 
+                { 
+                    Console.WriteLine($"Error shutting down/restarting Windows: {ex.Message}");
+                    return false; 
+                }
+            }
+            else if (IsOSPlatform(OSPlatform.OSX) || IsOSPlatform(OSPlatform.Linux))
+            {
+                string command = isRestart ? "shutdown -r now" : "shutdown -h now";
+                
+                try
+                {
+                    ExecuteShellCommand(command, "sh"); 
+                    return true;
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error executing shell command on Unix-like OS: {ex.Message}");
+                    return false;
+                }
+            }
+            
+            Console.WriteLine("Shutdown command not implemented for this OS.");
+            return false;
+        }
+
+
     }
 };
 
