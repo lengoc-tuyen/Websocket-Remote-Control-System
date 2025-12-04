@@ -4,8 +4,9 @@ using System.Diagnostics;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
+using System.IO;
+using Server.helper;
 using static System.Runtime.InteropServices.RuntimeInformation;
-
 
 namespace Server.Services
 {
@@ -60,7 +61,7 @@ namespace Server.Services
         {
             List<ProcessInfo> apps = new List<ProcessInfo>();
             
-            string psOutput = ExecuteShellCommand("ps -axco pid", "sh"); // dùng lệnh ps.. để liệt kê tiến trình đang chạy
+            string psOutput = ShellUtils.ExecuteShellCommand("ps -axco pid"); // dùng lệnh ps.. để liệt kê tiến trình đang chạy
             
             //chúng ta sẽ chỉ lọc các tiến trình có tên App 
             // mà không phải là các daemon hệ thống.
@@ -90,25 +91,6 @@ namespace Server.Services
                 catch {}
             }
             return apps.OrderBy(p => p.Name).ToList();
-        }
-
-        private string ExecuteShellCommand(string command, string shell = "/bin/bash")
-        {
-            var process = new Process()
-            {
-                StartInfo = new ProcessStartInfo
-                {
-                    FileName = shell,
-                    Arguments = $"-c \"{command}\"",
-                    RedirectStandardOutput = true,
-                    UseShellExecute = false,
-                    CreateNoWindow = true,
-                }
-            };
-            process.Start();
-            string result = process.StandardOutput.ReadToEnd();
-            process.WaitForExit();
-            return result;
         }
 
         // Start process hoặc app
@@ -149,7 +131,7 @@ namespace Server.Services
                     try
                     {
                         string command = $"open -a \"{processPath}\"";
-                        ExecuteShellCommand(command, "sh"); 
+                        ShellUtils.ExecuteShellCommand(command); 
                         return true;
                     }
                     catch(Exception innerEx)
