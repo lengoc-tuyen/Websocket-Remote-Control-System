@@ -1,0 +1,878 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8" />
+    <title>Trang chính – Christmas LAN Remote</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+            background: linear-gradient(160deg, #052e16, #020617 55%);
+            color: #f9fafb;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        header {
+            background: #064e3b;
+            color: #f9fafb;
+            padding: 8px 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid rgba(15, 23, 42, 0.8);
+        }
+
+        .app-title {
+            font-size: 18px;
+            font-weight: 700;
+        }
+
+        .app-title span { color: #f97316; }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 13px;
+        }
+
+        .ip-label {
+            background: rgba(15, 23, 42, 0.9);
+            padding: 4px 10px;
+            border-radius: 999px;
+            border: 1px solid rgba(148, 163, 184, 0.6);
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 999px;
+            display: inline-block;
+            margin-right: 4px;
+        }
+        .status-connected { background: #22c55e; }
+        .status-disconnected { background: #ef4444; }
+
+        .btn {
+            border: none;
+            border-radius: 999px; /* bo tròn nhiều */
+            padding: 7px 12px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .btn-primary {
+            background: #f97316;
+            color: #111827;
+        }
+
+        .btn-outline {
+            background: transparent;
+            color: #e5e7eb;
+            border: 1px solid rgba(148, 163, 184, 0.7);
+            text-decoration: none;
+        }
+
+        .btn-sm {
+            padding: 5px 10px;
+            font-size: 12px;
+        }
+
+        .layout {
+            flex: 1;
+            display: flex;
+            min-height: 0;
+        }
+
+        main {
+            flex: 1;
+            padding: 12px 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            overflow: hidden;
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 14px;
+        }
+
+        .section-header small {
+            font-size: 12px;
+            color: #9ca3af;
+        }
+
+        /* ======== TABS — Hộp quà + Nơ Giáng sinh 🎀 ======== */
+
+        .tabs {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            border-bottom: 1px solid rgba(148,163,184,0.4);
+            margin-top: 6px;
+            padding-left: 2px;
+        }
+
+        .tab-btn {
+            position: relative;
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            padding: 7px 14px;
+            font-size: 14px;
+            font-weight: 500;
+            color: #e5e7eb;
+            transition: 0.25s;
+            z-index: 2;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .tab-icon {
+            font-size: 15px;
+        }
+
+        .tab-btn.active {
+            color: #522b10;
+            font-weight: 700;
+        }
+
+        /* Hộp quà cho tab active */
+        .tab-btn.active::before {
+            content: "";
+            position: absolute;
+            top: -4px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: calc(100% + 22px);
+            height: 44px;
+            border-radius: 14px 14px 0 0;
+            background: linear-gradient(135deg, #fecaca, #fed7aa);
+            border: 2px solid #f97316;
+            box-shadow: 0 6px 16px rgba(0,0,0,0.45);
+            z-index: -1;
+        }
+
+        .bow-center, .bow-left, .bow-right {
+            display: none;
+        }
+
+        .tab-btn.active .bow-center {
+            display: block;
+            position: absolute;
+            top: -14px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 32px;
+            height: 18px;
+            border-radius: 999px;
+            background: linear-gradient(135deg, #b91c1c, #7f1d1d);
+            box-shadow: 0 3px 6px rgba(0,0,0,0.4);
+            z-index: 3;
+        }
+
+        .tab-btn.active .bow-left {
+            display: block;
+            position: absolute;
+            top: -8px;
+            left: calc(50% - 34px);
+            width: 26px;
+            height: 16px;
+            border-radius: 8px;
+            transform: rotate(-22deg);
+            background: linear-gradient(135deg, #dc2626, #7f1d1d);
+            box-shadow: 0 3px 5px rgba(0,0,0,0.4);
+            z-index: 2;
+        }
+
+        .tab-btn.active .bow-right {
+            display: block;
+            position: absolute;
+            top: -8px;
+            left: calc(50% + 8px);
+            width: 26px;
+            height: 16px;
+            border-radius: 8px;
+            transform: rotate(22deg);
+            background: linear-gradient(135deg, #dc2626, #7f1d1d);
+            box-shadow: 0 3px 5px rgba(0,0,0,0.4);
+            z-index: 2;
+        }
+
+        .tab-content {
+            flex: 1;
+            margin-top: -1px;
+            overflow: auto;
+            font-size: 14px;
+            display: flex;
+        }
+
+        /* HỘP QUÀ bọc nội dung chức năng */
+        .gift-box {
+            position: relative;
+            margin-top: 12px;
+            margin-bottom: 10px;
+            flex: 1;
+            border-radius: 18px;
+            background: linear-gradient(135deg, #fecaca, #fed7aa);
+            padding: 14px 14px 18px;
+            box-shadow: 0 18px 35px rgba(0,0,0,0.6);
+            border: 2px solid #f97316;
+            overflow: hidden;
+        }
+
+        .gift-box::before,
+        .gift-box::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            opacity: 0.7;
+        }
+
+        .gift-box::before {
+            width: 18px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: linear-gradient(180deg, rgba(185,28,28,0.95), rgba(127,29,29,0.95));
+            box-shadow: 0 0 12px rgba(127,29,29,0.7);
+        }
+
+        .gift-box::after {
+            top: 50%;
+            height: 18px;
+            transform: translateY(-50%);
+            background: linear-gradient(90deg, rgba(185,28,28,0.95), rgba(127,29,29,0.95));
+            box-shadow: 0 0 12px rgba(127,29,29,0.7);
+        }
+
+        .gift-inner {
+            position: relative;
+            z-index: 1;
+            background: rgba(15, 23, 42, 0.96);
+            border-radius: 14px;
+            padding: 12px;
+            border: 1px solid rgba(15,23,42,0.9);
+            color: #e5e7eb;
+        }
+
+        .gift-box.active {
+            animation: gift-pop 0.35s ease-out;
+        }
+
+        @keyframes gift-pop {
+            0%   { transform: scale(0.96) translateY(6px); opacity: 0; }
+            50%  { transform: scale(1.02) translateY(-2px); opacity: 1; }
+            100% { transform: scale(1) translateY(0); opacity: 1; }
+        }
+
+        .section-actions {
+            margin-top: 10px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        /* Tables */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+            margin-top: 8px;
+        }
+
+        th, td {
+            padding: 6px 8px;
+            border-bottom: 1px solid rgba(55,65,81,0.8);
+            text-align: left;
+        }
+
+        th { background: #020617; }
+
+        .tag {
+            display:inline-block;
+            padding:2px 8px;
+            border-radius:999px;
+            font-size:11px;
+        }
+        .tag-running { background:#22c55e33; color:#bbf7d0; }
+        .tag-stopped { background:#ef444433; color:#fecaca; }
+
+        #screenPreview {
+            max-width: 100%;
+            border-radius: 8px;
+            border: 1px solid rgba(148,163,184,0.6);
+            background: #020617;
+            margin-top: 6px;
+        }
+
+        #cameraPreview, #webcamPreview {
+            width: 100%;
+            max-height: 340px;
+            background: #020617;
+            border-radius: 8px;
+            border: 1px solid rgba(148,163,184,0.6);
+            margin-top: 6px;
+        }
+
+        .two-columns {
+            display:flex;
+            gap:10px;
+            flex-wrap:wrap;
+        }
+
+        .col {
+            flex:1;
+            min-width:240px;
+        }
+
+        .power-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-top: 10px;
+        }
+
+        .power-card {
+            flex: 1;
+            min-width: 180px;
+            background: #020617;
+            border-radius: 12px;
+            border: 1px dashed rgba(248,250,252,0.4);
+            padding: 10px;
+        }
+
+        .power-card h3 { font-size: 15px; margin-bottom: 4px; }
+        .power-card p { font-size: 13px; color: #9ca3af; margin-bottom: 8px; }
+
+        .btn-danger { background: #ef4444; color: #fef2f2; }
+        .btn-warning { background: #facc15; color: #451a03; }
+
+        .status-bar {
+            background: #0b1120;
+            color: #e5e7eb;
+            font-size: 12px;
+            padding: 5px 10px;
+            border-top: 1px solid rgba(15,23,42,0.9);
+        }
+
+        @media (max-width: 768px) {
+            .section-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 4px;
+            }
+        }
+    </style>
+</head>
+<body>
+<header>
+    <div class="app-title">
+        🎄 <span>Christmas</span> LAN Remote
+    </div>
+    <div class="header-right">
+        <div class="ip-label">
+            IP: <span id="ipLabel">Đang tải...</span>
+        </div>
+        <div id="connectionStatus">
+            <span id="statusDot" class="status-dot status-disconnected"></span>
+            <span id="statusText">Disconnected</span>
+        </div>
+        <button id="toggleConnectBtn" class="btn btn-primary">Kết nối</button>
+        <a href="ip.html" class="btn btn-outline">Đổi IP</a>
+    </div>
+</header>
+
+<div class="layout">
+    <main>
+        <div class="section-header">
+            <div>Đang điều khiển: <strong id="currentDeviceName">Server LAN</strong></div>
+            <small>Christmas Edition • Điều khiển 1 máy Client–Server qua WebSocket</small>
+        </div>
+
+        <!-- TAB + NƠ -->
+        <div class="tabs">
+            <button class="tab-btn active" data-target="appsSection">
+                <span class="tab-icon">📦</span> App
+                <span class="bow-center"></span>
+                <span class="bow-left"></span>
+                <span class="bow-right"></span>
+            </button>
+
+            <button class="tab-btn" data-target="processesSection">
+                <span class="tab-icon">⚙</span> Process
+                <span class="bow-center"></span>
+                <span class="bow-left"></span>
+                <span class="bow-right"></span>
+            </button>
+
+            <button class="tab-btn" data-target="screenSection">
+                <span class="tab-icon">🖥</span> Screen
+                <span class="bow-center"></span>
+                <span class="bow-left"></span>
+                <span class="bow-right"></span>
+            </button>
+
+            <button class="tab-btn" data-target="keysSection">
+                <span class="tab-icon">⌨</span> Keylog
+                <span class="bow-center"></span>
+                <span class="bow-left"></span>
+                <span class="bow-right"></span>
+            </button>
+
+            <button class="tab-btn" data-target="webcamSection">
+                <span class="tab-icon">📷</span> Webcam
+                <span class="bow-center"></span>
+                <span class="bow-left"></span>
+                <span class="bow-right"></span>
+            </button>
+
+            <button class="tab-btn" data-target="powerSection">
+                <span class="tab-icon">🔌</span> Power
+                <span class="bow-center"></span>
+                <span class="bow-left"></span>
+                <span class="bow-right"></span>
+            </button>
+        </div>
+
+        <div class="tab-content">
+            <!-- 1. App Control -->
+            <section id="appsSection" style="flex:1;">
+                <div class="gift-box active">
+                    <div class="gift-inner">
+                        <h2 style="font-size:15px; margin-bottom:6px;">📦 Quản lý ứng dụng (List / Start / Stop)</h2>
+                        <div class="section-actions">
+                            <button class="btn btn-primary btn-sm" id="refreshAppsBtn">Lấy danh sách App</button>
+                            <button class="btn btn-outline btn-sm" id="startSelectedAppBtn">Start App đã chọn</button>
+                            <button class="btn btn-outline btn-sm" id="stopSelectedAppBtn">Stop App đã chọn</button>
+                        </div>
+                        <table>
+                            <thead>
+                            <tr>
+                                <th style="width:30px;"></th>
+                                <th>Tên ứng dụng</th>
+                                <th>Trạng thái</th>
+                                <th>Ghi chú</th>
+                            </tr>
+                            </thead>
+                            <tbody id="appsTableBody">
+                            <!-- demo rows sẽ được thêm bằng JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 2. Process Control -->
+            <section id="processesSection" style="display:none; flex:1;">
+                <div class="gift-box">
+                    <div class="gift-inner">
+                        <h2 style="font-size:15px; margin-bottom:6px;">⚙ Quản lý tiến trình (List / Start / Stop)</h2>
+                        <div class="section-actions">
+                            <button class="btn btn-primary btn-sm" id="refreshProcessesBtn">Lấy danh sách Process</button>
+                            <button class="btn btn-outline btn-sm" id="startSelectedProcessBtn">Start Process</button>
+                            <button class="btn btn-outline btn-sm" id="stopSelectedProcessBtn">Stop Process</button>
+                        </div>
+                        <table>
+                            <thead>
+                            <tr>
+                                <th style="width:30px;"></th>
+                                <th>Tên tiến trình</th>
+                                <th>PID</th>
+                                <th>CPU / RAM</th>
+                            </tr>
+                            </thead>
+                            <tbody id="processesTableBody">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 3. Screenshot -->
+            <section id="screenSection" style="display:none; flex:1;">
+                <div class="gift-box">
+                    <div class="gift-inner">
+                        <h2 style="font-size:15px; margin-bottom:6px;">🖥 Chụp màn hình từ xa</h2>
+                        <div class="section-actions">
+                            <button class="btn btn-primary btn-sm" id="captureScreenBtn">Chụp màn hình</button>
+                            <button class="btn btn-outline btn-sm" id="refreshScreenBtn">Làm mới</button>
+                            <button class="btn btn-outline btn-sm" id="downloadScreenBtn">Tải ảnh về</button>
+                        </div>
+                        <img id="screenPreview" src="" alt="Ảnh màn hình Server sẽ hiển thị tại đây" />
+                    </div>
+                </div>
+            </section>
+
+            <!-- 4. Keylogger -->
+            <section id="keysSection" style="display:none; flex:1;">
+                <div class="gift-box">
+                    <div class="gift-inner">
+                        <h2 style="font-size:15px; margin-bottom:6px;">⌨ Keylogger (theo dõi phím bấm)</h2>
+                        <div class="section-actions">
+                            <button class="btn btn-primary btn-sm" id="startKeylogBtn">Bắt đầu keylogger</button>
+                            <button class="btn btn-outline btn-sm" id="stopKeylogBtn">Dừng keylogger</button>
+                            <button class="btn btn-outline btn-sm" id="clearKeylogBtn">Xoá log</button>
+                        </div>
+                        <table>
+                            <thead>
+                            <tr>
+                                <th>Thời gian</th>
+                                <th>Phím</th>
+                                <th>Cửa sổ</th>
+                            </tr>
+                            </thead>
+                            <tbody id="keylogTableBody">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 5. Webcam -->
+            <section id="webcamSection" style="display:none; flex:1;">
+                <div class="gift-box">
+                    <div class="gift-inner">
+                        <h2 style="font-size:15px; margin-bottom:6px;">📷 Webcam từ xa (On/Off + Record vài giây)</h2>
+                        <div class="section-actions">
+                            <button class="btn btn-primary btn-sm" id="webcamOnBtn">Bật webcam</button>
+                            <button class="btn btn-outline btn-sm" id="webcamOffBtn">Tắt webcam</button>
+                            <button class="btn btn-outline btn-sm" id="webcamRecordBtn">Record 5 giây</button>
+                        </div>
+                        <video id="webcamPreview" controls muted></video>
+                        <p style="margin-top:6px; font-size:12px; color:#9ca3af;">
+                            * Thực tế: Server sẽ bật webcam, record một đoạn video ngắn, encode (ví dụ MP4 / WebM) rồi gửi về Client qua WebSocket / HTTP.
+                        </p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 6. Power -->
+            <section id="powerSection" style="display:none; flex:1;">
+                <div class="gift-box">
+                    <div class="gift-inner">
+                        <h2 style="font-size:15px; margin-bottom:6px;">🔌 Điều khiển nguồn Server (Shutdown / Restart)</h2>
+                        <div class="power-grid">
+                            <div class="power-card">
+                                <h3>Restart</h3>
+                                <p>Khởi động lại máy từ xa. Dùng khi cần áp dụng cập nhật hoặc reset dịch vụ.</p>
+                                <button class="btn btn-warning btn-sm" id="restartBtn">Gửi lệnh Restart</button>
+                            </div>
+                            <div class="power-card">
+                                <h3>Shutdown</h3>
+                                <p>Tắt máy Server hoàn toàn. Hãy chắc chắn mọi dữ liệu đã được lưu.</p>
+                                <button class="btn btn-danger btn-sm" id="shutdownBtn">Gửi lệnh Shutdown</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </main>
+</div>
+
+<div class="status-bar">
+    <span id="statusBarText">Sẵn sàng. Chúc bạn demo đồ án WebSocket thật hoành tráng! 🎁</span>
+</div>
+
+<script>
+    // ===== Hiển thị IP đã nhập từ ip.html =====
+    const ipLabel = document.getElementById("ipLabel");
+    const storedIp = localStorage.getItem("remote_ip_config");
+    ipLabel.textContent = storedIp || "Chưa cấu hình (về lại trang IP)";
+
+    function setStatus(text) {
+        document.getElementById("statusBarText").textContent = text;
+        console.log("[STATUS]", text);
+    }
+
+    // ===== Tabs + gift box animation =====
+    const tabButtons = document.querySelectorAll(".tab-btn");
+    const sections = {
+        appsSection: document.getElementById("appsSection"),
+        processesSection: document.getElementById("processesSection"),
+        screenSection: document.getElementById("screenSection"),
+        keysSection: document.getElementById("keysSection"),
+        webcamSection: document.getElementById("webcamSection"),
+        powerSection: document.getElementById("powerSection"),
+    };
+
+    tabButtons.forEach((btn) => {
+        btn.addEventListener("click", () => {
+            tabButtons.forEach((b) => b.classList.remove("active"));
+            btn.classList.add("active");
+
+            const target = btn.getAttribute("data-target");
+
+            Object.keys(sections).forEach((key) => {
+                const sec = sections[key];
+                const box = sec.querySelector(".gift-box");
+                if (key === target) {
+                    sec.style.display = "block";
+                    if (box) {
+                        box.classList.remove("active");
+                        void box.offsetWidth; // reset animation
+                        box.classList.add("active");
+                    }
+                } else {
+                    sec.style.display = "none";
+                    if (box) box.classList.remove("active");
+                }
+            });
+        });
+    });
+
+    // ===== WebSocket demo (bạn sẽ gắn thật sau) =====
+    let ws = null;
+    let isConnected = false;
+    const toggleConnectBtn = document.getElementById("toggleConnectBtn");
+    const statusDot = document.getElementById("statusDot");
+    const statusText = document.getElementById("statusText");
+    const currentDeviceName = document.getElementById("currentDeviceName");
+
+    function updateConnectionUI(connected) {
+        isConnected = connected;
+        if (connected) {
+            statusDot.classList.remove("status-disconnected");
+            statusDot.classList.add("status-connected");
+            statusText.textContent = "Connected";
+            toggleConnectBtn.textContent = "Ngắt kết nối";
+            setStatus("Đã kết nối WebSocket (demo).");
+        } else {
+            statusDot.classList.remove("status-connected");
+            statusDot.classList.add("status-disconnected");
+            statusText.textContent = "Disconnected";
+            toggleConnectBtn.textContent = "Kết nối";
+            setStatus("Đã ngắt kết nối.");
+        }
+    }
+
+    function connectWebSocket() {
+        // Sau này: const url = storedIp?.startsWith("ws") ? storedIp : "ws://" + storedIp;
+        setStatus("Đây là kết nối demo (chưa kết nối thật).");
+        updateConnectionUI(true);
+    }
+
+    function disconnectWebSocket() {
+        updateConnectionUI(false);
+    }
+
+    toggleConnectBtn.addEventListener("click", () => {
+        if (!isConnected) connectWebSocket();
+        else disconnectWebSocket();
+    });
+
+    function requireConnection(actionName) {
+        if (!isConnected) {
+            setStatus("Không thể " + actionName + " vì chưa kết nối.");
+            alert("Vui lòng kết nối tới server trước.");
+            return false;
+        }
+        return true;
+    }
+
+    function sendCommand(command, payload = {}) {
+        // Sau này gắn ws.send(JSON.stringify({command, payload}));
+        console.log("SEND COMMAND:", command, payload);
+        setStatus("Đã gửi lệnh: " + command + " tới " + currentDeviceName.textContent);
+    }
+
+    // ===== 1. App Control (List / Start / Stop) =====
+    const appsTableBody = document.getElementById("appsTableBody");
+
+    function renderDemoApps() {
+        appsTableBody.innerHTML = "";
+        const demo = [
+            { name: "Chrome", status: "running", note: "Trình duyệt" },
+            { name: "Visual Studio Code", status: "running", note: "IDE" },
+            { name: "Notepad", status: "stopped", note: "Editor đơn giản" },
+        ];
+        demo.forEach((app, idx) => {
+            const tr = document.createElement("tr");
+            tr.innerHTML = `
+                <td><input type="radio" name="selectedApp" value="${app.name}" ${idx===0?"checked":""}></td>
+                <td>${app.name}</td>
+                <td>
+                    <span class="tag ${app.status === "running" ? "tag-running" : "tag-stopped"}">
+                        ${app.status === "running" ? "Đang chạy" : "Đã dừng"}
+                    </span>
+                </td>
+                <td>${app.note}</td>
+            `;
+            appsTableBody.appendChild(tr);
+        });
+    }
+    renderDemoApps();
+
+    document.getElementById("refreshAppsBtn").addEventListener("click", () => {
+        if (!requireConnection("lấy danh sách App")) return;
+        sendCommand("LIST_APPS");
+        // demo: render lại list
+        renderDemoApps();
+    });
+
+    function getSelectedRadio(name) {
+        const el = document.querySelector(`input[name="${name}"]:checked`);
+        return el ? el.value : null;
+    }
+
+    document.getElementById("startSelectedAppBtn").addEventListener("click", () => {
+        if (!requireConnection("start app")) return;
+        const appName = getSelectedRadio("selectedApp");
+        if (!appName) { alert("Chọn một App trước."); return; }
+        sendCommand("START_APP", { name: appName });
+    });
+
+    document.getElementById("stopSelectedAppBtn").addEventListener("click", () => {
+        if (!requireConnection("stop app")) return;
+        const appName = getSelectedRadio("selectedApp");
+        if (!appName) { alert("Chọn một App trước."); return; }
+        sendCommand("STOP_APP", { name: appName });
+    });
+
+    // ===== 2. Process Control =====
+    const processesTableBody = document.getElementById("processesTableBody");
+
+    function renderDemoProcesses() {
+        processesTableBody.innerHTML = "";
+        const demo = [
+            { name: "chrome.exe", pid: 2234, cpu: "4%", ram: "350MB" },
+            { name: "code.exe", pid: 3100, cpu: "2%", ram: "420MB" },
+            { name: "notepad.exe", pid: 1500, cpu: "0%", ram: "20MB" },
+        ];
+        demo.forEach((p, idx) => {
+            const tr = document.createElement("tr");
+            tr.innerHTML = `
+                <td><input type="radio" name="selectedProcess" value="${p.pid}" ${idx===0?"checked":""}></td>
+                <td>${p.name}</td>
+                <td>${p.pid}</td>
+                <td>${p.cpu} / ${p.ram}</td>
+            `;
+            processesTableBody.appendChild(tr);
+        });
+    }
+    renderDemoProcesses();
+
+    document.getElementById("refreshProcessesBtn").addEventListener("click", () => {
+        if (!requireConnection("lấy danh sách process")) return;
+        sendCommand("LIST_PROCESSES");
+        renderDemoProcesses();
+    });
+
+    document.getElementById("startSelectedProcessBtn").addEventListener("click", () => {
+        if (!requireConnection("start process")) return;
+        const pid = getSelectedRadio("selectedProcess");
+        if (!pid) { alert("Chọn một process trước."); return; }
+        sendCommand("START_PROCESS", { pid });
+    });
+
+    document.getElementById("stopSelectedProcessBtn").addEventListener("click", () => {
+        if (!requireConnection("stop process")) return;
+        const pid = getSelectedRadio("selectedProcess");
+        if (!pid) { alert("Chọn một process trước."); return; }
+        sendCommand("STOP_PROCESS", { pid });
+    });
+
+    // ===== 3. Screenshot =====
+    document.getElementById("captureScreenBtn").addEventListener("click", () => {
+        if (!requireConnection("chụp màn hình")) return;
+        sendCommand("CAPTURE_SCREEN");
+        // demo: ảnh placeholder
+        document.getElementById("screenPreview").src =
+            "https://via.placeholder.com/800x450/020617/ffffff?text=Screenshot+Demo";
+    });
+
+    document.getElementById("refreshScreenBtn").addEventListener("click", () => {
+        if (!requireConnection("làm mới màn hình")) return;
+        sendCommand("REFRESH_SCREEN");
+    });
+
+    document.getElementById("downloadScreenBtn").addEventListener("click", () => {
+        const img = document.getElementById("screenPreview");
+        if (!img.src) { alert("Chưa có ảnh màn hình để tải."); return; }
+        const a = document.createElement("a");
+        a.href = img.src;
+        a.download = "screenshot.png";
+        a.click();
+    });
+
+    // ===== 4. Keylogger =====
+    const keylogTableBody = document.getElementById("keylogTableBody");
+
+    function addKeyLogRow(key, windowTitle) {
+        const tr = document.createElement("tr");
+        const now = new Date().toLocaleTimeString();
+        tr.innerHTML = `<td>${now}</td><td>${key}</td><td>${windowTitle}</td>`;
+        keylogTableBody.prepend(tr);
+    }
+
+    // demo vài dòng
+    addKeyLogRow("Ctrl + S", "Visual Studio Code");
+    addKeyLogRow("Enter", "Chrome – Christmas LAN Remote");
+
+    document.getElementById("startKeylogBtn").addEventListener("click", () => {
+        if (!requireConnection("bắt đầu keylogger")) return;
+        sendCommand("KEYLOGGER_START");
+    });
+
+    document.getElementById("stopKeylogBtn").addEventListener("click", () => {
+        if (!requireConnection("dừng keylogger")) return;
+        sendCommand("KEYLOGGER_STOP");
+    });
+
+    document.getElementById("clearKeylogBtn").addEventListener("click", () => {
+        keylogTableBody.innerHTML = "";
+        setStatus("Đã xoá toàn bộ keylog hiển thị.");
+    });
+
+    // ===== 5. Webcam =====
+    const webcamVideo = document.getElementById("webcamPreview");
+
+    document.getElementById("webcamOnBtn").addEventListener("click", () => {
+        if (!requireConnection("bật webcam")) return;
+        sendCommand("WEBCAM_ON");
+        // demo: bạn có thể sau này gán src = "data:video/..." do server trả
+    });
+
+    document.getElementById("webcamOffBtn").addEventListener("click", () => {
+        if (!requireConnection("tắt webcam")) return;
+        sendCommand("WEBCAM_OFF");
+        // demo: tắt video
+        webcamVideo.removeAttribute("src");
+        webcamVideo.load();
+    });
+
+    document.getElementById("webcamRecordBtn").addEventListener("click", () => {
+        if (!requireConnection("record webcam")) return;
+        sendCommand("WEBCAM_RECORD", { seconds: 5 });
+        // demo: có thể gán 1 video mẫu
+        // webcamVideo.src = "sample-video.mp4";
+        // webcamVideo.play();
+    });
+
+    // ===== 6. Power =====
+    document.getElementById("restartBtn").addEventListener("click", () => {
+        if (!requireConnection("gửi lệnh restart")) return;
+        if (confirm("Bạn có chắc muốn RESTART máy Server?")) {
+            sendCommand("RESTART");
+        }
+    });
+
+    document.getElementById("shutdownBtn").addEventListener("click", () => {
+        if (!requireConnection("gửi lệnh shutdown")) return;
+        if (confirm("Bạn có chắc muốn SHUTDOWN máy Server?")) {
+            sendCommand("SHUTDOWN");
+        }
+    });
+</script>
+</body>
+</html>

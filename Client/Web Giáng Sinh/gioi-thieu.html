@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8" />
+    <title>Giới thiệu đồ án – Christmas LAN Remote</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+            min-height: 100vh;
+            background: linear-gradient(160deg, #022c22, #0f172a);
+            color: #f9fafb;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 16px;
+            position: relative;
+            overflow: hidden;
+        }
+        body::before {
+            content: "";
+            position: fixed; inset: 0;
+            pointer-events: none;
+            background-image:
+                radial-gradient(circle, rgba(255,255,255,0.85) 1px, transparent 2px),
+                radial-gradient(circle, rgba(255,255,255,0.55) 1px, transparent 2px);
+            background-size: 70px 70px, 110px 110px;
+            background-position: 0 0, 35px 35px;
+            opacity: 0.18;
+        }
+        .card {
+            position: relative;
+            z-index: 1;
+            max-width: 720px;
+            width: 100%;
+            background: rgba(15, 23, 42, 0.95);
+            border-radius: 18px;
+            padding: 24px 20px 18px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.6);
+            border: 1px solid rgba(148, 163, 184, 0.4);
+        }
+        h1 {
+            font-size: 24px;
+            margin-bottom: 10px;
+        }
+        .accent { color: #f97316; }
+        p { margin: 6px 0; font-size: 14px; line-height: 1.5; color: #e5e7eb; }
+        ul { margin: 8px 0 6px 18px; font-size: 14px; }
+        li { margin-bottom: 4px; }
+        .chips { margin-top: 10px; font-size: 12px; color: #9ca3af; }
+        .chip {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 999px;
+            border: 1px solid rgba(148,163,184,0.6);
+            margin-right: 6px;
+            margin-bottom: 4px;
+        }
+        .actions {
+            margin-top: 14px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+        }
+        a.btn {
+            text-decoration: none;
+            font-size: 13px;
+            padding: 6px 12px;
+            border-radius: 999px;
+            border: 1px solid #f97316;
+            color: #f97316;
+            background: transparent;
+            transition: 0.18s;
+        }
+        a.btn.primary {
+            background: #f97316;
+            color: #111827;
+        }
+        a.btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 16px rgba(0,0,0,0.5);
+        }
+    </style>
+</head>
+<body>
+<div class="card">
+    <h1>🎄 Giới thiệu đồ án <span class="accent">LAN Remote Control</span></h1>
+    <p>
+        Đây là đồ án môn Mạng Máy Tính với mục tiêu xây dựng một ứng dụng web cho phép
+        <strong>điều khiển máy tính từ xa trong mạng LAN</strong>, lấy cảm hứng từ TeamViewer, nhưng được “đóng gói”
+        trong chủ đề <strong>Giáng Sinh</strong> để giao diện sinh động và dễ nhớ hơn.
+    </p>
+    <p>Các chức năng chính phía backend và agent (máy bị điều khiển):</p>
+    <ul>
+        <li>Theo dõi và xem <strong>camera</strong> trên máy mục tiêu.</li>
+        <li>Ghi nhận <strong>keylogger</strong> (các phím đã gõ).</li>
+        <li><strong>Chụp màn hình</strong> từ xa và gửi về web.</li>
+        <li>Gửi lệnh <strong>Restart</strong> và <strong>Shutdown</strong> máy trong LAN.</li>
+        <li>Kết nối realtime bằng <strong>WebSocket / Socket</strong>.</li>
+    </ul>
+    <p>
+        Phần của đồ án mà trang này tập trung là <strong>frontend web</strong>: thiết kế giao diện người dùng,
+        luồng các trang, và cách hiển thị/điều khiển các chức năng trên nền Giáng Sinh.
+    </p>
+    <div class="chips">
+        <span class="chip">WebSocket</span>
+        <span class="chip">LAN Only</span>
+        <span class="chip">Christmas Theme</span>
+        <span class="chip">Remote Control</span>
+    </div>
+    <div class="actions">
+        <a href="index.html" class="btn">⬅ Quay lại trang Noel</a>
+        <a href="ip.html" class="btn primary">Tiếp tục: Nhập địa chỉ IP ➜</a>
+    </div>
+</div>
+</body>
+</html>

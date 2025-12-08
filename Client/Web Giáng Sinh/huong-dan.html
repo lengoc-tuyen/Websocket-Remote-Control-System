@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8" />
+    <title>Hướng dẫn sử dụng – Christmas LAN Remote</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+            min-height: 100vh;
+            background: radial-gradient(circle at top, #b91c1c 0, #450a0a 60%);
+            color: #fef2f2;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 16px;
+            position: relative;
+            overflow: hidden;
+        }
+        body::before {
+            content: "";
+            position: fixed; inset: 0;
+            pointer-events: none;
+            background-image:
+                radial-gradient(circle, rgba(255,255,255,0.9) 1px, transparent 2px),
+                radial-gradient(circle, rgba(248,250,252,0.6) 1px, transparent 2px);
+            background-size: 80px 80px, 120px 120px;
+            background-position: 0 0, 40px 40px;
+            opacity: 0.25;
+        }
+        .card {
+            position: relative; z-index: 1;
+            max-width: 760px; width: 100%;
+            background: rgba(15, 23, 42, 0.96);
+            border-radius: 18px;
+            padding: 24px 22px 18px;
+            box-shadow: 0 22px 40px rgba(0,0,0,0.7);
+            border: 1px solid rgba(248, 250, 252, 0.25);
+        }
+        h1 { font-size: 24px; margin-bottom: 8px; }
+        .accent { color: #22c55e; }
+        h2 { font-size: 17px; margin-top: 14px; margin-bottom: 6px; }
+        p { font-size: 14px; margin: 4px 0; color: #e5e7eb; }
+        ol, ul { margin-left: 20px; font-size: 14px; }
+        li { margin: 3px 0; }
+        .note {
+            margin-top: 8px;
+            font-size: 13px;
+            color: #facc15;
+        }
+        .actions {
+            margin-top: 14px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+        }
+        a.btn {
+            text-decoration: none;
+            font-size: 13px;
+            padding: 6px 12px;
+            border-radius: 999px;
+            border: 1px solid #22c55e;
+            color: #bbf7d0;
+            background: transparent;
+            transition: 0.18s;
+        }
+        a.btn.primary {
+            background: #22c55e;
+            color: #052e16;
+        }
+        a.btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 16px rgba(0,0,0,0.5);
+        }
+    </style>
+</head>
+<body>
+<div class="card">
+    <h1>🎅 Hướng dẫn sử dụng <span class="accent">LAN Remote Control</span></h1>
+    <p>Dưới đây là luồng sử dụng cơ bản của ứng dụng (ở mức người dùng cuối):</p>
+
+    <h2>1. Chuẩn bị</h2>
+    <ul>
+        <li>Các máy phải nằm trong <strong>cùng mạng LAN</strong>.</li>
+        <li>Trên máy bị điều khiển cần chạy chương trình <strong>Agent</strong>.</li>
+        <li>Trên máy điều khiển sẽ mở trình duyệt chạy <strong>Web App Giáng Sinh</strong>.</li>
+    </ul>
+
+    <h2>2. Kết nối</h2>
+    <ol>
+        <li>Mở trang web chính của ứng dụng.</li>
+        <li>Nhập <strong>địa chỉ IP</strong> của server/WebSocket hoặc của máy Agent (tuỳ thiết kế).</li>
+        <li>Nhấn nút <strong>Kết nối</strong> để thiết lập kết nối realtime.</li>
+    </ol>
+
+    <h2>3. Các chức năng chính trên web</h2>
+    <ul>
+        <li><strong>Camera:</strong> xem luồng video từ camera của máy bị điều khiển.</li>
+        <li><strong>Screen:</strong> yêu cầu chụp màn hình và hiển thị ảnh mới nhất.</li>
+        <li><strong>Keylogger:</strong> xem danh sách các phím đã được Agent ghi lại.</li>
+        <li><strong>Power:</strong> gửi lệnh <em>Restart</em> hoặc <em>Shutdown</em> máy từ xa.</li>
+    </ul>
+
+    <p class="note">
+        ⚠ Lưu ý: Ứng dụng chỉ dùng cho mục đích học tập, thí nghiệm trong môi trường
+        kiểm soát (phòng lab, LAN nội bộ) và phải được <strong>cho phép</strong> từ người sở hữu máy.
+    </p>
+
+    <div class="actions">
+        <a href="index.html" class="btn">⬅ Quay lại trang Noel</a>
+        <a href="ip.html" class="btn primary">Tiếp tục: Nhập địa chỉ IP ➜</a>
+    </div>
+</div>
+</body>
+</html>
