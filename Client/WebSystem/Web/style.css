@@ -1,0 +1,93 @@
+/* (Giữ nguyên toàn bộ CSS đẹp của bạn) */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    background: linear-gradient(160deg, #052e16, #020617 55%);
+    color: #f9fafb;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+header {
+    background: #064e3b;
+    color: #f9fafb;
+    padding: 8px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid rgba(15, 23, 42, 0.8);
+}
+
+.app-title {
+    font-size: 18px;
+    font-weight: 700;
+}
+
+.app-title span { color: #f97316; }
+
+.header-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+}
+
+.ip-label {
+    background: rgba(15, 23, 42, 0.9);
+    padding: 4px 10px;
+    border-radius: 999px;
+    border: 1px solid rgba(148, 163, 184, 0.6);
+    display: flex;
+    align-items: center;
+}
+
+.status-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 999px;
+    display: inline-block;
+    margin-right: 4px;
+}
+.status-connected { background: #22c55e; }
+.status-disconnected { background: #ef4444; }
+
+.btn {
+    border: none;
+    border-radius: 999px;
+    padding: 7px 12px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.btn-primary { background: #f97316; color: #111827; }
+.btn-outline { background: transparent; color: #e5e7eb; border: 1px solid rgba(148, 163, 184, 0.7); text-decoration: none; }
+.btn-sm { padding: 5px 10px; font-size: 12px; }
+.btn-danger { background: #ef4444; color: #fef2f2; }
+.btn-warning { background: #facc15; color: #451a03; }
+
+.layout { flex: 1; display: flex; min-height: 0; }
+main { flex: 1; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; overflow: hidden; }
+
+.section-header { display: flex; justify-content: space-between; align-items: center; font-size: 14px; }
+.section-header small { font-size: 12px; color: #9ca3af; }
+
+.tabs { display: flex; flex-wrap: wrap; gap: 6px; border-bottom: 1px solid rgba(148,163,184,0.4); margin-top: 6px; padding-left: 2px; }
+.tab-btn { position: relative; background: transparent; border: none; cursor: pointer; padding: 7px 14px; font-size: 14px; font-weight: 500; color: #e5e7eb; transition: 0.25s; z-index: 2; display: flex; align-items: center; gap: 6px; }
+.tab-btn.active { color: #522b10; font-weight: 700; }
+.tab-btn.active::before { content: ""; position: absolute; top: -4px; left: 50%; transform: translateX(-50%); width: calc(100% + 22px); height: 44px; border-radius: 14px 14px 0 0; background: linear-gradient(135deg, #fecaca, #fed7aa); border: 2px solid #f97316; box-shadow: 0 6px 16px rgba(0,0,0,0.45); z-index: -1; }
+
+.tab-content { flex: 1; margin-top: -1px; overflow: auto; font-size: 14px; display: flex; }
+.gift-box { position: relative; margin-top: 12px; margin-bottom: 10px; flex: 1; border-radius: 18px; background: linear-gradient(135deg, #fecaca, #fed7aa); padding: 14px 14px 18px; box-shadow: 0 18px 35px rgba(0,0,0,0.6); border: 2px solid #f97316; overflow: hidden; }
+.gift-inner { position: relative; z-index: 1; background: rgba(15, 23, 42, 0.96); border-radius: 14px; padding: 12px; border: 1px solid rgba(15,23,42,0.9); color: #e5e7eb; height: 100%; overflow-y: auto;}
+
+.section-actions { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 8px; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; }
+th, td { padding: 6px 8px; border-bottom: 1px solid rgba(55,65,81,0.8); text-align: left; }
+th { background: #020617; }
+
+#screenPreview, #webcamPreview { max-width: 100%; max-height: 400px; border-radius: 8px; border: 1px solid rgba(148,163,184,0.6); background: #020617; margin-top: 6px; object-fit: contain; }
+
+.status-bar { background: #0b1120; color: #e5e7eb; font-size: 12px; padding: 5px 10px; border-top: 1px solid rgba(15,23,42,0.9); display: flex; justify-content: space-between;}
