@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "w1ijsRAw45flWqVMM0+p43jX73vfDdfaz+0EiMdNM6x90w3ITavjTvyY9Wo+6oBW/Dm+2PRtbInhb/Qjd7kh9w==",
+  "dgSpecHash": "VrDBc/G4af2jWpkcJ72C4wAehFSQcCMTS4v3vWXmJeyt+DqykMDIkYwGjXwFy1eprRluiTdAwNkaOndZ3t0Zxg==",
   "success": true,
-  "projectFilePath": "/Users/lengoctuyen/Documents/Websocket-Remove-Control-System/Server/Server.csproj",
+  "projectFilePath": "/Users/lengoctuyen/Documents/Allmyproject/Websocket-Remove-Control-System/Server/Server.csproj",
   "expectedPackageFiles": [
     "/Users/lengoctuyen/.nuget/packages/microsoft.netcore.platforms/5.0.0/microsoft.netcore.platforms.5.0.0.nupkg.sha512",
     "/Users/lengoctuyen/.nuget/packages/microsoft.win32.registry/5.0.0/microsoft.win32.registry.5.0.0.nupkg.sha512",
