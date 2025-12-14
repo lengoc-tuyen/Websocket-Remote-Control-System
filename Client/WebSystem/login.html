@@ -544,5 +544,74 @@
   })();
 </script>
 
+<!-- Background Music -->
+<audio id="bgMusic" src="music.mp3" loop preload="auto"></audio>
+
+<script>
+  (function () {
+    const bg = document.getElementById("bgMusic");
+    if (!bg) return;
+
+    bg.volume = 0.35; // chỉnh nhỏ vừa nghe
+
+    // thử chạy ngay khi load (có thể bị chặn)
+    bg.play().catch(() => {});
+
+    // nếu bị chặn, chỉ cần 1 tương tác là chạy
+    const startOnce = () => {
+      bg.play().catch(() => {});
+      window.removeEventListener("click", startOnce);
+      window.removeEventListener("keydown", startOnce);
+      window.removeEventListener("touchstart", startOnce);
+    };
+
+    window.addEventListener("click", startOnce);
+    window.addEventListener("keydown", startOnce);
+    window.addEventListener("touchstart", startOnce);
+  })();
+</script>
+
+<!-- Snowman Chatbot -->
+<div id="snowman-chatbot">
+  <div id="snowmanBubble" class="chat-bubble">Xin chào</div>
+  <img src="MainWeb/giphy.gif" alt="Snowman Chatbot" class="snowman-img">
+</div>
+
+<script>
+  (function () {
+    const bubble = document.getElementById("snowmanBubble");
+    const img = document.querySelector("#snowman-chatbot .snowman-img");
+    if (!bubble) return;
+
+    function showHello() {
+      bubble.textContent = "Xin chào";
+      bubble.style.opacity = "1";
+      bubble.style.transform = "translateY(0)";
+      setTimeout(() => {
+        bubble.style.opacity = "0";
+        bubble.style.transform = "translateY(10px)";
+      }, 2000);
+    }
+
+    // hiện 1 lần khi vào trang
+    showHello();
+    // lặp mỗi 5s
+    setInterval(showHello, 5000);
+
+    // (Tuỳ chọn) click snowman -> hiện 1 câu khác
+    if (img) {
+      img.addEventListener("click", () => {
+        bubble.textContent = "Bạn cần mình giúp gì nè? 🤖";
+        bubble.style.opacity = "1";
+        bubble.style.transform = "translateY(0)";
+        setTimeout(() => {
+          bubble.style.opacity = "0";
+          bubble.style.transform = "translateY(10px)";
+        }, 2500);
+      });
+    }
+  })();
+</script>
+
 </body>
 </html>
