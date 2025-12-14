@@ -195,7 +195,7 @@
         }
 
         /* Snowman Chatbot */
-        #snowman-chatbot{
+        #snowman-container{
             position: fixed;
             right: 16px;
             bottom: 16px;
@@ -271,6 +271,37 @@
             </a>
         </div>
     </div>
+    <div id="snowman-container">
+        
+        <!-- [MỚI] THÊM KHUNG CHAT VÀO ĐÂY (Mặc định ẩn) -->
+        <div id="chat-window">
+            <div class="chat-header">
+                <span>☃️ Snowman AI</span>
+                <!-- Nút tắt -->
+                <button onclick="toggleChat()" style="background:none;border:none;color:white;cursor:pointer;font-size:16px;">&times;</button>
+            </div>
+            <div id="chat-messages" class="chat-body">
+                <div class="msg-bot">Xin chào</div>
+            </div>
+            <div class="chat-input-area">
+                <input type="text" id="chat-input" placeholder="Hỏi gì đó..." onkeypress="if(event.key==='Enter') sendChatUI()">
+                <button onclick="sendChatUI()">Gửi</button>
+            </div>
+        </div>
+
+        <!-- Avatar & Bong bóng (Giữ nguyên của bạn) -->
+        <div style="position: relative; display: flex; flex-direction: column; align-items: center;">
+            <div id="snowmanBubble" class="chat-bubble">Xin chào</div>
+            
+            <!-- [QUAN TRỌNG] THÊM onclick="toggleChat()" VÀO HÌNH CỦA BẠN -->
+            <img src="MainWeb/giphy.gif" alt="Snowman Chatbot" class="snowman-img" id="snowman-avatar" onclick="toggleChat()">
+        </div>
+    </div>
+
+    <!-- Background Music -->
+    <audio id="bgMusic" src="music.mp3" loop preload="auto"></audio>
+
+    <!-- SCRIPTS -->
 
     <!-- Tuyết rơi -->
    <script>
@@ -350,47 +381,31 @@ document.addEventListener("DOMContentLoaded", () => {
   })();
 </script>
 
-<!-- Snowman Chatbot -->
-<div id="snowman-chatbot">
-  <div id="snowmanBubble" class="chat-bubble">Xin chào</div>
-  <img src="MainWeb/giphy.gif" alt="Snowman Chatbot" class="snowman-img">
-</div>
+<script src="MainWeb/connection.js"></script>
+    <script src="MainWeb/ui.js"></script>
 
-<script>
-  (function () {
-    const bubble = document.getElementById("snowmanBubble");
-    const img = document.querySelector("#snowman-chatbot .snowman-img");
-    if (!bubble) return;
+    <!-- Script Bong bóng chào (Code cũ của bạn, đã chỉnh sửa nhẹ để tương thích chatbox) -->
+    <script>
+      document.addEventListener("DOMContentLoaded", () => {
+        const bubble = document.getElementById("snowmanBubble");
+        if (bubble) {
+            function showHello() {
+                // [MỚI] Nếu đang mở chat thì không hiện bong bóng nữa
+                const chatWindow = document.getElementById('chat-window');
+                if (chatWindow && getComputedStyle(chatWindow).display !== 'none') return;
 
-    function showHello() {
-      bubble.textContent = "Xin chào";
-      bubble.style.opacity = "1";
-      bubble.style.transform = "translateY(0)";
-      setTimeout(() => {
-        bubble.style.opacity = "0";
-        bubble.style.transform = "translateY(10px)";
-      }, 2000);
-    }
-
-    // hiện 1 lần khi vào trang
-    showHello();
-    // lặp mỗi 5s
-    setInterval(showHello, 5000);
-
-    // (Tuỳ chọn) click snowman -> hiện 1 câu khác
-    if (img) {
-      img.addEventListener("click", () => {
-        bubble.textContent = "Bạn cần mình giúp gì nè? 🤖";
-        bubble.style.opacity = "1";
-        bubble.style.transform = "translateY(0)";
-        setTimeout(() => {
-          bubble.style.opacity = "0";
-          bubble.style.transform = "translateY(10px)";
-        }, 2500);
+                bubble.textContent = "Xin chào";
+                bubble.style.opacity = "1";
+                bubble.style.transform = "translateY(0)";
+                setTimeout(() => {
+                    bubble.style.opacity = "0";
+                    bubble.style.transform = "translateY(10px)";
+                }, 2000);
+            }
+            showHello();
+            setInterval(showHello, 5000);
+        }
       });
-    }
-  })();
-</script>
-
+    </script>
 </body>
 </html>

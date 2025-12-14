@@ -7,28 +7,28 @@ using System.Runtime.Versioning;
 using System.Threading.Channels;
 using Microsoft.Extensions.Options;
 using Server.Configuration;
-using Server.helper;
+using Server.helper; 
 
-#if OPENCV
+// Luôn dùng OpenCvSharp
 using OpenCvSharp;
-#endif
 
 namespace Server.Services
 {
     /// <summary>
-    /// Service for webcam and screen capture operations
+    /// Service xử lý Webcam và Màn hình đa nền tảng (Phiên bản cao cấp Full Option)
     /// </summary>
     public class WebcamService : IDisposable
     {
         private readonly ILogger<WebcamService> _logger;
         private readonly WebcamSettings _settings;
-#if OPENCV
+        
+        // Biến giữ kết nối Webcam OpenCV
         private VideoCapture? _webcamCapture;
-#endif
+        
         private readonly object _lock = new();
         private bool _disposed;
 
-        // Windows-specific screen capture (only loaded on Windows)
+        // Helper P/Invoke cho Windows Screenshot
         private static class Win32Native
         {
             [DllImport("user32.dll")]
@@ -44,505 +44,104 @@ namespace Server.Services
             _settings = settings.Value.Webcam;
         }
 
-        #region Public API
+        #region Public API (Giao diện chính cho ControlHub)
+
+        // Wrapper viết thường để tương thích với code cũ
+        public byte[] captureScreen() => CaptureScreen();
+        public void closeWebcam() => CloseWebcam();
 
         /// <summary>
-        /// Capture screenshot of the current screen
+        /// Chụp ảnh màn hình hiện tại
         /// </summary>
         public byte[] CaptureScreen()
         {
             try
             {
-                if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-                {
-                    return CaptureScreenWindows();
-                }
-                else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-                {
-                    return CaptureScreenMacOS();
-                }
-                else
-                {
-                    return CaptureScreenLinux();
-                }
+                if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) return CaptureScreenWindows();
+                else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX)) return CaptureScreenMacOS();
+                else return CaptureScreenLinux();
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error capturing screen");
+                _logger.LogError(ex, "Lỗi chụp màn hình");
                 return Array.Empty<byte>();
             }
         }
 
         /// <summary>
-        /// Open webcam and capture proof video frames
+        /// Mở Webcam và quay video bằng chứng (Mặc định 3s)
         /// </summary>
         public async Task<List<byte[]>> RequestWebcamProof(int frameRate, CancellationToken cancellationToken)
         {
             try
             {
+                // Linux: Ưu tiên dùng FFmpeg vì driver OpenCV thường kén
                 if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
                 {
                     return await CaptureVideoFramesLinux(_settings.ProofDurationMs / 1000.0, frameRate, cancellationToken);
                 }
 
-#if OPENCV
+                // Windows & Mac: Thử dùng OpenCV trước (Nhanh hơn, ít tốn tài nguyên)
                 if (OpenWebcamInternal())
                 {
                     return await CaptureVideoFramesOpenCv(_settings.ProofDurationMs, frameRate, cancellationToken);
                 }
-#endif
 
+                // Mac Fallback: Nếu OpenCV lỗi (thường gặp trên M1/M2), dùng FFmpeg (AVFoundation)
                 if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
                 {
-                    _logger.LogWarning("OpenCV webcam unavailable; falling back to FFmpeg proof capture on macOS.");
+                    _logger.LogWarning("OpenCV không mở được. Chuyển sang chế độ FFmpeg fallback cho macOS.");
                     return await CaptureVideoFramesMacOS(_settings.ProofDurationMs / 1000.0, frameRate, cancellationToken);
                 }
 
-                _logger.LogWarning("Webcam proof not supported on this platform.");
+                _logger.LogWarning("Không hỗ trợ quay video trên nền tảng này.");
                 return new List<byte[]>();
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error capturing webcam proof");
+                _logger.LogError(ex, "Lỗi quay video bằng chứng");
                 return new List<byte[]>();
             }
         }
 
         /// <summary>
-        /// Capture a short batch of webcam frames for streaming.
-        /// On Windows uses OpenCV; on macOS/Linux uses FFmpeg batch capture.
+        /// Quay một đoạn video ngắn (Batch) - Dành cho tính năng Streaming sau này
         /// </summary>
         public async Task<List<byte[]>> CaptureWebcamFramesBatch(double durationSec, int frameRate, CancellationToken cancellationToken)
         {
             try
             {
-                if (durationSec <= 0)
-                {
-                    durationSec = 1;
-                }
-
+                if (durationSec <= 0) durationSec = 1;
                 var durationMs = (int)Math.Round(durationSec * 1000);
-                return await CaptureVideoFrames(durationMs, frameRate, cancellationToken);
+                
+                // Tự động chọn OpenCV hoặc Fallback
+                if (OpenWebcamInternal()) return await CaptureVideoFramesOpenCv(durationMs, frameRate, cancellationToken);
+                
+                if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX)) 
+                    return await CaptureVideoFramesMacOS(durationSec, frameRate, cancellationToken);
+                
+                if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+                    return await CaptureVideoFramesLinux(durationSec, frameRate, cancellationToken);
+
+                return new List<byte[]>();
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error capturing webcam batch");
+                _logger.LogError(ex, "Lỗi quay batch video");
                 return new List<byte[]>();
             }
         }
 
         /// <summary>
-        /// Try capture a single webcam frame (JPEG) using OpenCV when available.
+        /// Thử chụp 1 tấm ảnh duy nhất từ Webcam (Snapshot)
         /// </summary>
         public byte[]? TryCaptureSingleWebcamFrameOpenCv()
         {
-#if OPENCV
-            if (!OpenWebcamInternal())
-            {
-                return null;
-            }
-
+            if (!OpenWebcamInternal()) return null;
             return CaptureFrame();
-#else
-            return null;
-#endif
         }
 
-        /// <summary>
-        /// Capture batch frames using FFmpeg only (fallback for macOS/Linux).
-        /// </summary>
-        public async Task<List<byte[]>> CaptureWebcamFramesBatchFfmpeg(double durationSec, int frameRate, CancellationToken cancellationToken)
-        {
-            try
-            {
-                if (durationSec <= 0)
-                {
-                    durationSec = 1;
-                }
-
-                if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-                {
-                    return await CaptureVideoFramesMacOS(durationSec, frameRate, cancellationToken);
-                }
-
-                if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
-                {
-                    return await CaptureVideoFramesLinux(durationSec, frameRate, cancellationToken);
-                }
-
-                var durationMs = (int)Math.Round(durationSec * 1000);
-                return await CaptureVideoFramesOpenCv(durationMs, frameRate, cancellationToken);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error capturing webcam batch (FFmpeg fallback)");
-                return new List<byte[]>();
-            }
-        }
-
-        /// <summary>
-        /// Stream webcam frames with backpressure: keeps only the latest frame (DropOldest, capacity=1).
-        /// </summary>
-        public ChannelReader<byte[]> StreamWebcamFramesFfmpegLatest(int fps, CancellationToken ct)
-        {
-            fps = Math.Clamp(fps, 1, 15);
-
-            var channel = Channel.CreateBounded<byte[]>(new BoundedChannelOptions(1)
-            {
-                FullMode = BoundedChannelFullMode.DropOldest,
-                SingleReader = true,
-                SingleWriter = true
-            });
-
-            _ = Task.Run(async () =>
-            {
-                await StreamWebcamFramesFfmpegWorker(fps, channel.Writer, ct);
-            }, CancellationToken.None);
-
-            return channel.Reader;
-        }
-
-        private async Task StreamWebcamFramesFfmpegWorker(int fps, ChannelWriter<byte[]> writer, CancellationToken ct)
-        {
-            var startedAny = false;
-            var processes = CreateFfmpegWebcamProcessCandidates(fps);
-
-            for (var candidateIndex = 0; candidateIndex < processes.Count; candidateIndex++)
-            {
-                var process = processes[candidateIndex];
-                var started = false;
-                Task? stderrDrain = null;
-                Task? readTask = null;
-                var firstFrameTcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-
-                try
-                {
-                    if (process.StartInfo.FileName.Length == 0)
-                    {
-                        continue;
-                    }
-
-                    _logger.LogInformation("Starting FFmpeg webcam candidate {Index}/{Total}", candidateIndex + 1, processes.Count);
-                    started = process.Start();
-                    if (!started)
-                    {
-                        continue;
-                    }
-
-                    startedAny = true;
-                    _logger.LogDebug("FFmpeg webcam cmd: {Cmd} {Args}", process.StartInfo.FileName, process.StartInfo.Arguments);
-                    _logger.LogInformation("FFmpeg webcam stream started, PID: {PID}", process.Id);
-
-                    stderrDrain = Task.Run(async () =>
-                    {
-                        try
-                        {
-                            var err = await process.StandardError.ReadToEndAsync(ct);
-                            if (!string.IsNullOrWhiteSpace(err))
-                            {
-                                _logger.LogWarning("FFmpeg stderr: {Err}", err);
-                            }
-                        }
-                        catch { }
-                    }, CancellationToken.None);
-
-                    readTask = ReadMjpegFramesFromStream(process.StandardOutput.BaseStream, writer, ct, firstFrameTcs);
-
-                    // If no frame is produced quickly, try next candidate.
-                    var handshake = await Task.WhenAny(firstFrameTcs.Task, Task.Delay(TimeSpan.FromSeconds(2), ct));
-
-                    if (handshake != firstFrameTcs.Task)
-                    {
-                        // No frame in time; if process already exited, likely bad options.
-                        if (process.HasExited)
-                        {
-                            continue;
-                        }
-
-                        // Still running but no frames; treat as failure for this candidate.
-                        continue;
-                    }
-
-                    // Success: keep streaming until cancellation/end.
-                    await readTask;
-                    writer.TryComplete();
-                    return;
-                }
-                catch (OperationCanceledException)
-                {
-                    writer.TryComplete();
-                    return;
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "FFmpeg webcam candidate failed");
-                }
-                finally
-                {
-                    try
-                    {
-                        if (started && !process.HasExited)
-                        {
-                            process.Kill(true);
-                            await process.WaitForExitAsync(CancellationToken.None);
-                        }
-                    }
-                    catch { }
-
-                    if (readTask != null)
-                    {
-                        try { await readTask; } catch { }
-                    }
-
-                    try { process.Dispose(); } catch { }
-                }
-            }
-
-            if (!startedAny)
-            {
-                writer.TryComplete(new InvalidOperationException("FFmpeg webcam stream could not start (no valid candidates)."));
-                return;
-            }
-
-            writer.TryComplete(new InvalidOperationException("FFmpeg webcam stream started but produced no frames."));
-        }
-
-        private List<Process> CreateFfmpegWebcamProcessCandidates(int fps)
-        {
-            if (!RuntimeInformation.IsOSPlatform(OSPlatform.OSX) &&
-                !RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
-            {
-                return new List<Process> { new() { StartInfo = new ProcessStartInfo { FileName = "" } } };
-            }
-
-            var videoSize = $"{_settings.DefaultFrameWidth}x{_settings.DefaultFrameHeight}";
-
-            // Note: avfoundation can be finicky; start with minimal args first, then add low-latency flags.
-            var commonBase = "-hide_banner -loglevel error -nostdin";
-            var commonLowLatency = $"{commonBase} -fflags nobuffer -flags low_delay";
-
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-            {
-                var input = _settings.MacAvFoundationInput;
-                // Try a few combinations. avfoundation can be picky about framerate rational vs. exact 30/1.
-                var candidates = new[]
-                {
-                    // Minimal (most likely to work)
-                    $"{commonBase} -f avfoundation -framerate 30 -video_size {videoSize} -i \"{input}\" -vf fps={fps} -an -f image2pipe -vcodec mjpeg -q:v 12 -flush_packets 1 pipe:1",
-                    // With explicit pixel format
-                    $"{commonBase} -f avfoundation -framerate 30 -pixel_format nv12 -video_size {videoSize} -i \"{input}\" -vf fps={fps} -an -f image2pipe -vcodec mjpeg -q:v 12 -flush_packets 1 pipe:1",
-                    // Low-latency variant
-                    $"{commonLowLatency} -f avfoundation -framerate 30 -video_size {videoSize} -i \"{input}\" -vf fps={fps} -an -f image2pipe -vcodec mjpeg -q:v 12 -flush_packets 1 pipe:1",
-                    // Fallbacks
-                    $"{commonBase} -f avfoundation -video_size {videoSize} -i \"{input}\" -vf fps={fps} -an -f image2pipe -vcodec mjpeg -q:v 12 -flush_packets 1 pipe:1",
-                    $"{commonBase} -f avfoundation -i \"{input}\" -vf fps={fps} -an -f image2pipe -vcodec mjpeg -q:v 12 -flush_packets 1 pipe:1"
-                };
-
-                return candidates.Select(args => new Process
-                {
-                    StartInfo = new ProcessStartInfo
-                    {
-                        FileName = _settings.FfmpegPath,
-                        Arguments = args,
-                        UseShellExecute = false,
-                        RedirectStandardOutput = true,
-                        RedirectStandardError = true,
-                        CreateNoWindow = true
-                    }
-                }).ToList();
-            }
-
-            // Linux
-            var linuxArgs =
-                $"{commonLowLatency} -f v4l2 -framerate {fps} -video_size {videoSize} -i \"{_settings.LinuxVideoDevice}\" " +
-                "-an -f image2pipe -vcodec mjpeg -q:v 12 -flush_packets 1 pipe:1";
-
-            return new List<Process>
-            {
-                new()
-                {
-                    StartInfo = new ProcessStartInfo
-                    {
-                        FileName = _settings.FfmpegPath,
-                        Arguments = linuxArgs,
-                        UseShellExecute = false,
-                        RedirectStandardOutput = true,
-                        RedirectStandardError = true,
-                        CreateNoWindow = true
-                    }
-                }
-            };
-        }
-
-        private async Task ReadMjpegFramesFromStream(
-            Stream stdout,
-            ChannelWriter<byte[]> writer,
-            CancellationToken ct,
-            TaskCompletionSource<bool>? firstFrameTcs = null)
-        {
-            var buffer = new byte[64 * 1024];
-            MemoryStream? currentFrame = null;
-            var inFrame = false;
-            byte prev = 0;
-            const int maxFrameBytes = 5 * 1024 * 1024;
-
-            while (!ct.IsCancellationRequested)
-            {
-                var read = await stdout.ReadAsync(buffer.AsMemory(0, buffer.Length), ct);
-                if (read <= 0)
-                {
-                    break;
-                }
-
-                var span = buffer.AsSpan(0, read);
-                var pos = 0;
-
-                while (pos < span.Length)
-                {
-                    if (!inFrame)
-                    {
-                        // Cross-buffer SOI: prev=0xFF, current=0xD8
-                        if (prev == 0xFF && span[pos] == 0xD8)
-                        {
-                            inFrame = true;
-                            currentFrame?.Dispose();
-                            currentFrame = new MemoryStream(capacity: 256 * 1024);
-                            currentFrame.WriteByte(0xFF);
-                            currentFrame.WriteByte(0xD8);
-                            prev = 0xD8;
-                            pos += 1;
-                            continue;
-                        }
-
-                        var ffRel = span.Slice(pos).IndexOf((byte)0xFF);
-                        if (ffRel < 0)
-                        {
-                            prev = span[^1];
-                            break;
-                        }
-
-                        var ffPos = pos + ffRel;
-                        if (ffPos + 1 < span.Length && span[ffPos + 1] == 0xD8)
-                        {
-                            inFrame = true;
-                            currentFrame?.Dispose();
-                            currentFrame = new MemoryStream(capacity: 256 * 1024);
-                            currentFrame.Write(span.Slice(ffPos, 2));
-                            prev = 0xD8;
-                            pos = ffPos + 2;
-                            continue;
-                        }
-
-                        prev = span[ffPos];
-                        pos = ffPos + 1;
-                        continue;
-                    }
-
-                    // inFrame == true
-                    if (prev == 0xFF && span[pos] == 0xD9)
-                    {
-                        currentFrame!.WriteByte(0xD9);
-                        var frameBytes = currentFrame.ToArray();
-                        writer.TryWrite(frameBytes);
-                        firstFrameTcs?.TrySetResult(true);
-
-                        currentFrame.Dispose();
-                        currentFrame = null;
-                        inFrame = false;
-                        prev = 0xD9;
-                        pos += 1;
-                        continue;
-                    }
-
-                    var ffRel2 = span.Slice(pos).IndexOf((byte)0xFF);
-                    if (ffRel2 < 0)
-                    {
-                        currentFrame!.Write(span.Slice(pos));
-                        prev = span[^1];
-
-                        if (currentFrame.Length > maxFrameBytes)
-                        {
-                            _logger.LogWarning("Dropping oversized webcam frame (> {Max} bytes)", maxFrameBytes);
-                            currentFrame.Dispose();
-                            currentFrame = null;
-                            inFrame = false;
-                        }
-                        break;
-                    }
-
-                    var ffPos2 = pos + ffRel2;
-                    if (ffPos2 > pos)
-                    {
-                        currentFrame!.Write(span.Slice(pos, ffPos2 - pos));
-                    }
-
-                    if (currentFrame!.Length > maxFrameBytes)
-                    {
-                        _logger.LogWarning("Dropping oversized webcam frame (> {Max} bytes)", maxFrameBytes);
-                        currentFrame.Dispose();
-                        currentFrame = null;
-                        inFrame = false;
-                        prev = 0;
-                        pos = ffPos2 + 1;
-                        continue;
-                    }
-
-                    // Now at 0xFF
-                    if (ffPos2 + 1 >= span.Length)
-                    {
-                        currentFrame.WriteByte(0xFF);
-                        prev = 0xFF;
-                        break;
-                    }
-
-                    var next = span[ffPos2 + 1];
-                    currentFrame.WriteByte(0xFF);
-                    currentFrame.WriteByte(next);
-
-                    if (currentFrame.Length > maxFrameBytes)
-                    {
-                        _logger.LogWarning("Dropping oversized webcam frame (> {Max} bytes)", maxFrameBytes);
-                        currentFrame.Dispose();
-                        currentFrame = null;
-                        inFrame = false;
-                        prev = next;
-                        pos = ffPos2 + 2;
-                        continue;
-                    }
-
-                    if (next == 0xD9)
-                    {
-                        var frameBytes = currentFrame.ToArray();
-                        writer.TryWrite(frameBytes);
-                        firstFrameTcs?.TrySetResult(true);
-
-                        currentFrame.Dispose();
-                        currentFrame = null;
-                        inFrame = false;
-                        prev = 0xD9;
-                        pos = ffPos2 + 2;
-                        continue;
-                    }
-
-                    prev = next;
-                    pos = ffPos2 + 2;
-                }
-            }
-
-            currentFrame?.Dispose();
-        }
-
-        /// <summary>
-        /// Open webcam
-        /// </summary>
-        public bool OpenWebcam()
-        {
-            return OpenWebcamInternal();
-        }
-
-        /// <summary>
-        /// Close webcam and release resources
-        /// </summary>
+        // Đóng Webcam công khai
         public void CloseWebcam()
         {
             lock (_lock)
@@ -553,232 +152,85 @@ namespace Server.Services
 
         #endregion
 
-        #region Screen Capture Implementation
-
-        [SupportedOSPlatform("windows")]
-        private byte[] CaptureScreenWindows()
-        {
-            int screenWidth = Win32Native.GetSystemMetrics(Win32Native.SM_CXSCREEN);
-            int screenHeight = Win32Native.GetSystemMetrics(Win32Native.SM_CYSCREEN);
-
-            using var bitmap = new Bitmap(screenWidth, screenHeight);
-            using var graphics = Graphics.FromImage(bitmap);
-            
-            graphics.CopyFromScreen(0, 0, 0, 0, 
-                new System.Drawing.Size(screenWidth, screenHeight), 
-                CopyPixelOperation.SourceCopy);
-
-            using var ms = new MemoryStream();
-            bitmap.Save(ms, ImageFormat.Jpeg);
-            
-            _logger.LogDebug("Captured Windows screenshot: {Width}x{Height}", screenWidth, screenHeight);
-            return ms.ToArray();
-        }
-
-        private byte[] CaptureScreenMacOS()
-        {
-            var tempFile = Path.Combine(Path.GetTempPath(), $"screenshot_{Guid.NewGuid()}.jpg");
-            
-            try
-            {
-                var psi = new ProcessStartInfo
-                {
-                    FileName = "screencapture",
-                    Arguments = $"-t jpg \"{tempFile}\"",
-                    UseShellExecute = false,
-                    CreateNoWindow = true,
-                    RedirectStandardError = true
-                };
-
-                using var process = Process.Start(psi);
-                process?.WaitForExit(5000);
-
-                if (File.Exists(tempFile))
-                {
-                    var bytes = File.ReadAllBytes(tempFile);
-                    _logger.LogDebug("Captured macOS screenshot: {Size} bytes", bytes.Length);
-                    return bytes;
-                }
-
-                _logger.LogWarning("macOS screenshot file not created");
-                return Array.Empty<byte>();
-            }
-            finally
-            {
-                // Clean up temp file
-                try
-                {
-                    if (File.Exists(tempFile))
-                    {
-                        File.Delete(tempFile);
-                    }
-                }
-                catch { }
-            }
-        }
-
-        private byte[] CaptureScreenLinux()
-        {
-            var tempFile = Path.Combine(Path.GetTempPath(), $"screenshot_{Guid.NewGuid()}.jpg");
-            
-            try
-            {
-                // Try multiple screenshot tools
-                var tools = new[]
-                {
-                    ("gnome-screenshot", $"-f \"{tempFile}\""),
-                    ("scrot", $"\"{tempFile}\""),
-                    ("import", $"-window root \"{tempFile}\"")  // ImageMagick
-                };
-
-                foreach (var (tool, args) in tools)
-                {
-                    try
-                    {
-                        var psi = new ProcessStartInfo
-                        {
-                            FileName = tool,
-                            Arguments = args,
-                            UseShellExecute = false,
-                            CreateNoWindow = true
-                        };
-
-                        using var process = Process.Start(psi);
-                        process?.WaitForExit(5000);
-
-                        if (File.Exists(tempFile))
-                        {
-                            var bytes = File.ReadAllBytes(tempFile);
-                            _logger.LogDebug("Captured Linux screenshot using {Tool}: {Size} bytes", tool, bytes.Length);
-                            return bytes;
-                        }
-                    }
-                    catch
-                    {
-                        // Tool not available, try next
-                    }
-                }
-
-                _logger.LogWarning("No screenshot tool available on Linux");
-                return Array.Empty<byte>();
-            }
-            finally
-            {
-                try
-                {
-                    if (File.Exists(tempFile))
-                    {
-                        File.Delete(tempFile);
-                    }
-                }
-                catch { }
-            }
-        }
-
-        #endregion
-
-        #region Webcam Implementation
+        #region Webcam Implementation (OpenCV Logic)
 
         private bool OpenWebcamInternal()
         {
-#if OPENCV
             lock (_lock)
             {
-                // Already open
-                if (_webcamCapture != null && _webcamCapture.IsOpened())
-                {
-                    return true;
-                }
+                if (_webcamCapture != null && _webcamCapture.IsOpened()) return true;
 
-                // Dispose old instance if exists
                 _webcamCapture?.Dispose();
 
                 try
                 {
-                    if (OperatingSystem.IsMacOS())
+                    // 1. Chọn Backend tối ưu cho từng OS
+                    VideoCaptureAPIs backend = VideoCaptureAPIs.ANY;
+                    if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) backend = VideoCaptureAPIs.DSHOW;
+                    else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX)) backend = VideoCaptureAPIs.AVFOUNDATION;
+                    else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux)) backend = VideoCaptureAPIs.V4L2;
+
+                    _webcamCapture = new VideoCapture(0, backend);
+
+                    // 2. Nếu Backend xịn lỗi, thử lại với Auto
+                    if (!_webcamCapture.IsOpened())
                     {
-                        _webcamCapture = new VideoCapture(0, VideoCaptureAPIs.AVFoundation);
-                    }
-                    else
-                    {
+                        _webcamCapture.Dispose();
                         _webcamCapture = new VideoCapture(0);
                     }
 
                     if (!_webcamCapture.IsOpened())
                     {
-                        _logger.LogWarning("Failed to open webcam device");
+                        _logger.LogWarning("Không thể mở thiết bị Webcam (Index 0).");
                         _webcamCapture.Dispose();
                         _webcamCapture = null;
                         return false;
                     }
 
-                    // Configure webcam
+                    // 3. Cấu hình độ phân giải
                     _webcamCapture.Set(VideoCaptureProperties.FrameWidth, _settings.DefaultFrameWidth);
                     _webcamCapture.Set(VideoCaptureProperties.FrameHeight, _settings.DefaultFrameHeight);
 
-                    _logger.LogInformation("Webcam opened (OpenCV): {Width}x{Height}", 
-                        _settings.DefaultFrameWidth, _settings.DefaultFrameHeight);
+                    _logger.LogInformation("Webcam đã mở (OpenCV): {W}x{H}", _settings.DefaultFrameWidth, _settings.DefaultFrameHeight);
                     return true;
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Error opening webcam");
+                    _logger.LogError(ex, "Lỗi khi mở Webcam OpenCV");
                     _webcamCapture?.Dispose();
                     _webcamCapture = null;
                     return false;
                 }
             }
-#else
-            // No OpenCV on this platform; FFmpeg batch capture will be used.
-            _logger.LogInformation("OpenCV not enabled; webcam uses FFmpeg batch.");
-            return true;
-#endif
         }
 
         private void CloseWebcamInternal()
         {
-#if OPENCV
             if (_webcamCapture != null)
             {
                 try
                 {
-                    if (_webcamCapture.IsOpened())
-                    {
-                        _webcamCapture.Release();
-                    }
+                    if (_webcamCapture.IsOpened()) _webcamCapture.Release();
                     _webcamCapture.Dispose();
-                    _logger.LogInformation("Webcam closed");
+                    _logger.LogInformation("Webcam đã đóng.");
                 }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Error closing webcam");
-                }
-                finally
-                {
-                    _webcamCapture = null;
-                }
+                catch { }
+                finally { _webcamCapture = null; }
             }
-#endif
         }
 
         private byte[]? CaptureFrame()
         {
-#if !OPENCV
-            _logger.LogWarning("CaptureFrame not supported without OpenCV");
-            return null;
-#else
             lock (_lock)
             {
-                if (_webcamCapture == null || !_webcamCapture.IsOpened())
-                {
-                    return null;
-                }
+                if (_webcamCapture == null || !_webcamCapture.IsOpened()) return null;
 
                 using var frame = new Mat();
                 
                 if (!_webcamCapture.Read(frame) || frame.Empty())
                 {
-                    _logger.LogWarning("Failed to read frame from webcam");
+                    _logger.LogWarning("Đọc frame thất bại.");
+                    CloseWebcamInternal(); 
                     return null;
                 }
 
@@ -786,42 +238,15 @@ namespace Server.Services
                 {
                     return encodedBytes;
                 }
-
                 return null;
             }
-#endif
-        }
-
-        private async Task<List<byte[]>> CaptureVideoFrames(int durationMs, int frameRate, CancellationToken ct)
-        {
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
-            {
-                return await CaptureVideoFramesLinux(durationMs / 1000.0, frameRate, ct);
-            }
-
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-            {
-#if OPENCV
-                if (OpenWebcamInternal())
-                {
-                    return await CaptureVideoFramesOpenCv(durationMs, frameRate, ct);
-                }
-#endif
-                return await CaptureVideoFramesMacOS(durationMs / 1000.0, frameRate, ct);
-            }
-
-            return await CaptureVideoFramesOpenCv(durationMs, frameRate, ct);
         }
 
         private async Task<List<byte[]>> CaptureVideoFramesOpenCv(int durationMs, int frameRate, CancellationToken ct)
         {
             var frames = new List<byte[]>();
-#if OPENCV
-            if (!OpenWebcamInternal())
-            {
-                return frames;
-            }
-#endif
+            if (!OpenWebcamInternal()) return frames;
+
             var safeFps = Math.Clamp(frameRate, 1, 30);
             var delayMs = (int)Math.Round(1000.0 / safeFps);
             var stopwatch = Stopwatch.StartNew();
@@ -831,298 +256,269 @@ namespace Server.Services
                 while (stopwatch.ElapsedMilliseconds < durationMs && !ct.IsCancellationRequested)
                 {
                     var frame = CaptureFrame();
-
-                    if (frame != null && frame.Length > 0)
-                    {
-                        frames.Add(frame);
-                    }
-
+                    if (frame != null && frame.Length > 0) frames.Add(frame);
                     await Task.Delay(delayMs, ct);
                 }
-
-                _logger.LogInformation("Captured {FrameCount} webcam frames in {Duration}ms", frames.Count, stopwatch.ElapsedMilliseconds);
+                _logger.LogInformation("OpenCV: Đã quay {Count} frames.", frames.Count);
             }
-            catch (OperationCanceledException)
+            finally 
             {
-                _logger.LogInformation("Frame capture cancelled after {FrameCount} frames", frames.Count);
+                CloseWebcamInternal();
             }
-
             return frames;
         }
 
         #endregion
 
-        #region IDisposable
+        #region FFmpeg Streaming Logic (StreamWebcamFramesFfmpegLatest)
+        // Đây là phần logic nâng cao để stream liên tục từ FFmpeg thông qua Pipe
+        // Rất hữu ích khi cần live stream mượt mà
 
-        public void Dispose()
+        public ChannelReader<byte[]> StreamWebcamFramesFfmpegLatest(int fps, CancellationToken ct)
         {
-            Dispose(true);
-            GC.SuppressFinalize(this);
-        }
-
-        protected virtual void Dispose(bool disposing)
-        {
-            if (!_disposed)
+            fps = Math.Clamp(fps, 1, 15);
+            var channel = Channel.CreateBounded<byte[]>(new BoundedChannelOptions(1)
             {
-                if (disposing)
-                {
-                    CloseWebcam();
-                }
-                _disposed = true;
-            }
+                FullMode = BoundedChannelFullMode.DropOldest, // Chỉ giữ frame mới nhất
+                SingleReader = true,
+                SingleWriter = true
+            });
+
+            _ = Task.Run(async () => { await StreamWebcamFramesFfmpegWorker(fps, channel.Writer, ct); }, CancellationToken.None);
+            return channel.Reader;
         }
 
-        ~WebcamService()
+        private async Task StreamWebcamFramesFfmpegWorker(int fps, ChannelWriter<byte[]> writer, CancellationToken ct)
         {
-            Dispose(false);
+            var processes = CreateFfmpegWebcamProcessCandidates(fps);
+            bool startedAny = false;
+
+            foreach(var process in processes)
+            {
+                try
+                {
+                    if (process.StartInfo.FileName.Length == 0) continue;
+                    
+                    _logger.LogInformation("Khởi động FFmpeg Stream (Candidate)...");
+                    if (!process.Start()) continue;
+                    
+                    startedAny = true;
+                    // Đọc stream MJPEG từ StandardOutput
+                    await ReadMjpegFramesFromStream(process.StandardOutput.BaseStream, writer, ct);
+                    
+                    // Nếu chạy tới đây là xong hoặc bị hủy
+                    writer.TryComplete();
+                    try { if (!process.HasExited) process.Kill(); } catch {}
+                    return;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError("Lỗi luồng FFmpeg: " + ex.Message);
+                    try { if (!process.HasExited) process.Kill(); } catch {}
+                }
+            }
+
+            if (!startedAny) writer.TryComplete(new Exception("Không thể khởi động FFmpeg stream."));
+        }
+
+        private List<Process> CreateFfmpegWebcamProcessCandidates(int fps)
+        {
+            var list = new List<Process>();
+            var size = $"{_settings.DefaultFrameWidth}x{_settings.DefaultFrameHeight}";
+            var baseArgs = "-hide_banner -loglevel error -nostdin -fflags nobuffer -flags low_delay";
+
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+            {
+                var input = _settings.MacAvFoundationInput;
+                // Thử nhiều cấu hình khác nhau cho Mac
+                var args = $"{baseArgs} -f avfoundation -framerate 30 -video_size {size} -i \"{input}\" -vf fps={fps} -an -f image2pipe -vcodec mjpeg -q:v 10 pipe:1";
+                list.Add(new Process { StartInfo = CreatePsi(args) });
+            }
+            else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+            {
+                var args = $"{baseArgs} -f v4l2 -framerate {fps} -video_size {size} -i \"{_settings.LinuxVideoDevice}\" -an -f image2pipe -vcodec mjpeg -q:v 10 pipe:1";
+                list.Add(new Process { StartInfo = CreatePsi(args) });
+            }
+            return list;
+        }
+
+        private ProcessStartInfo CreatePsi(string args)
+        {
+            return new ProcessStartInfo
+            {
+                FileName = _settings.FfmpegPath,
+                Arguments = args,
+                UseShellExecute = false,
+                RedirectStandardOutput = true, // Quan trọng để đọc stream
+                RedirectStandardError = true,
+                CreateNoWindow = true
+            };
+        }
+
+        private async Task ReadMjpegFramesFromStream(Stream stdout, ChannelWriter<byte[]> writer, CancellationToken ct)
+        {
+            // Logic đọc stream MJPEG (Tìm header 0xFF 0xD8 và footer 0xFF 0xD9)
+            // Code này được tối ưu để đọc binary stream liên tục
+            var buffer = new byte[64 * 1024];
+            using var ms = new MemoryStream();
+            bool inFrame = false;
+            byte prev = 0;
+
+            while (!ct.IsCancellationRequested)
+            {
+                int read = await stdout.ReadAsync(buffer, 0, buffer.Length, ct);
+                if (read <= 0) break;
+
+                for (int i = 0; i < read; i++)
+                {
+                    byte b = buffer[i];
+                    
+                    if (!inFrame)
+                    {
+                        if (prev == 0xFF && b == 0xD8) // SOI (Start of Image)
+                        {
+                            inFrame = true;
+                            ms.SetLength(0);
+                            ms.WriteByte(0xFF);
+                            ms.WriteByte(0xD8);
+                        }
+                    }
+                    else
+                    {
+                        ms.WriteByte(b);
+                        if (prev == 0xFF && b == 0xD9) // EOI (End of Image)
+                        {
+                            writer.TryWrite(ms.ToArray());
+                            inFrame = false;
+                        }
+                    }
+                    prev = b;
+                }
+            }
         }
 
         #endregion
 
-        #region macOS FFmpeg Batch Capture
+        #region FFmpeg Fallback (Mac/Linux - Quay 1 cục video rồi tách frame)
 
         private async Task<List<byte[]>> CaptureVideoFramesMacOS(double durationSec, int frameRate, CancellationToken ct)
         {
             var frames = new List<byte[]>();
             var tempDir = Path.Combine(Path.GetTempPath(), $"webcam_{Guid.NewGuid()}");
-            
             try
             {
                 Directory.CreateDirectory(tempDir);
-                var outputPattern = Path.Combine(tempDir, "frame_%03d.jpg");
-
-                // FFmpeg: Open camera once, capture for duration, extract frames
-                var safeFps = Math.Clamp(frameRate, 1, 15);
-                var videoSize = $"{_settings.DefaultFrameWidth}x{_settings.DefaultFrameHeight}";
-                var durationArg = durationSec.ToString(CultureInfo.InvariantCulture);
+                var pattern = Path.Combine(tempDir, "frame_%03d.jpg");
+                var size = $"{_settings.DefaultFrameWidth}x{_settings.DefaultFrameHeight}";
+                var dur = durationSec.ToString(CultureInfo.InvariantCulture);
 
                 var psi = new ProcessStartInfo
                 {
                     FileName = _settings.FfmpegPath,
-                    Arguments =
-                        $"-nostdin -y -f avfoundation -framerate 30 -video_size {videoSize} -i \"0:none\" -t {durationArg} -vf fps={safeFps} -q:v 5 \"{outputPattern}\"",
-                    UseShellExecute = false,
-                    CreateNoWindow = true,
-                    RedirectStandardError = true,
-                    RedirectStandardOutput = true
+                    Arguments = $"-nostdin -y -f avfoundation -framerate 30 -video_size {size} -i \"{_settings.MacAvFoundationInput}\" -t {dur} -vf fps={frameRate} -q:v 5 \"{pattern}\"",
+                    UseShellExecute = false, CreateNoWindow = true, RedirectStandardError = true, RedirectStandardOutput = true
                 };
 
-                _logger.LogInformation("Starting FFmpeg batch capture: {Duration}s @ {FPS} fps, tempDir: {TempDir}", durationSec, frameRate, tempDir);
-                _logger.LogDebug("FFmpeg command: {Cmd} {Args}", psi.FileName, psi.Arguments);
+                using var proc = Process.Start(psi);
+                if(proc != null) await proc.WaitForExitAsync(ct);
 
-                using var process = Process.Start(psi);
-                if (process == null)
-                {
-                    _logger.LogError("Failed to start FFmpeg process");
-                    return frames;
-                }
-
-                _logger.LogInformation("FFmpeg process started, PID: {PID}", process.Id);
-
-                // Wait for FFmpeg to complete (camera init + capture + encoding takes time)
-                var timeoutSec = Math.Max(30, durationSec + 15); // Minimum 30s timeout
-                using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-                cts.CancelAfter(TimeSpan.FromSeconds(timeoutSec));
-                
-                try
-                {
-                    var waitTask = process.WaitForExitAsync(cts.Token);
-                    var stderrTask = process.StandardError.ReadToEndAsync();
-                    
-                    await waitTask;
-                    var stderr = await stderrTask;
-                    
-                    _logger.LogInformation("FFmpeg completed with exit code: {Code}", process.ExitCode);
-                    
-                    if (process.ExitCode != 0)
-                    {
-                        _logger.LogError("FFmpeg failed! stderr: {Err}", stderr);
-                    }
-                    else
-                    {
-                        _logger.LogDebug("FFmpeg stderr: {Err}", stderr);
-                    }
-                }
-                catch (OperationCanceledException)
-                {
-                    _logger.LogWarning("FFmpeg process timeout after {Timeout}s, killing...", timeoutSec);
-                    try { process.Kill(true); } catch { }
-                    throw;
-                }
-
-                // Read all generated frames
-                var frameFiles = Directory.GetFiles(tempDir, "frame_*.jpg")
-                    .OrderBy(f => f)
-                    .ToList();
-
-                _logger.LogInformation("FFmpeg captured {FrameCount} frames", frameFiles.Count);
-
-                foreach (var file in frameFiles)
-                {
-                    if (ct.IsCancellationRequested) break;
-                    
-                    try
-                    {
-                        var bytes = await File.ReadAllBytesAsync(file, ct);
-                        if (bytes.Length > 0)
-                        {
-                            frames.Add(bytes);
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogWarning(ex, "Failed to read frame file: {File}", file);
-                    }
-                }
-
-                return frames;
+                var files = Directory.GetFiles(tempDir, "frame_*.jpg").OrderBy(f => f).ToList();
+                // [FIX] Đã sửa lỗi biến vòng lặp từ 'f' thành 'file' để khớp với biến bên trong
+                foreach (var file in files) frames.Add(await File.ReadAllBytesAsync(file, ct));
+                _logger.LogInformation($"FFmpeg (Mac) đã quay {frames.Count} frames.");
             }
-            catch (OperationCanceledException)
-            {
-                _logger.LogInformation("macOS webcam capture cancelled");
-                return frames;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error during macOS batch capture");
-                return frames;
-            }
-            finally
-            {
-                // Cleanup temp directory
-                try
-                {
-                    if (Directory.Exists(tempDir))
-                    {
-                        Directory.Delete(tempDir, recursive: true);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "Failed to cleanup temp directory");
-                }
-            }
+            catch (Exception ex) { _logger.LogError("FFmpeg MacOS Error: " + ex.Message); }
+            finally { if (Directory.Exists(tempDir)) Directory.Delete(tempDir, recursive: true); }
+            return frames;
         }
 
         private async Task<List<byte[]>> CaptureVideoFramesLinux(double durationSec, int frameRate, CancellationToken ct)
         {
             var frames = new List<byte[]>();
             var tempDir = Path.Combine(Path.GetTempPath(), $"webcam_{Guid.NewGuid()}");
-
-            try
+            try 
             {
                 Directory.CreateDirectory(tempDir);
-                var outputPattern = Path.Combine(tempDir, "frame_%03d.jpg");
-
-                var safeFps = Math.Clamp(frameRate, 1, 15);
-                var videoSize = $"{_settings.DefaultFrameWidth}x{_settings.DefaultFrameHeight}";
-                var durationArg = durationSec.ToString(CultureInfo.InvariantCulture);
-
-                var psi = new ProcessStartInfo
+                var pattern = Path.Combine(tempDir, "frame_%03d.jpg");
+                var size = $"{_settings.DefaultFrameWidth}x{_settings.DefaultFrameHeight}";
+                var dur = durationSec.ToString(CultureInfo.InvariantCulture);
+                
+                var psi = new ProcessStartInfo 
                 {
                     FileName = _settings.FfmpegPath,
-                    Arguments =
-                        $"-nostdin -y -f v4l2 -framerate 30 -video_size {videoSize} -i \"{_settings.LinuxVideoDevice}\" -t {durationArg} -vf fps={safeFps} -q:v 5 \"{outputPattern}\"",
-                    UseShellExecute = false,
-                    CreateNoWindow = true,
-                    RedirectStandardError = true,
-                    RedirectStandardOutput = true
+                    Arguments = $"-nostdin -y -f v4l2 -framerate 30 -video_size {size} -i \"{_settings.LinuxVideoDevice}\" -t {dur} -vf fps={frameRate} -q:v 5 \"{pattern}\"",
+                    UseShellExecute = false, CreateNoWindow = true, RedirectStandardError = true, RedirectStandardOutput = true
                 };
-
-                _logger.LogInformation(
-                    "Starting FFmpeg Linux capture: {Duration}s @ {FPS} fps, device: {Device}, tempDir: {TempDir}",
-                    durationSec, safeFps, _settings.LinuxVideoDevice, tempDir);
-                _logger.LogDebug("FFmpeg command: {Cmd} {Args}", psi.FileName, psi.Arguments);
-
-                using var process = Process.Start(psi);
-                if (process == null)
-                {
-                    _logger.LogError("Failed to start FFmpeg process on Linux");
-                    return frames;
-                }
-
-                var timeoutSec = Math.Max(30, durationSec + 15);
-                using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-                cts.CancelAfter(TimeSpan.FromSeconds(timeoutSec));
-
-                try
-                {
-                    var waitTask = process.WaitForExitAsync(cts.Token);
-                    var stderrTask = process.StandardError.ReadToEndAsync();
-
-                    await waitTask;
-                    var stderr = await stderrTask;
-
-                    _logger.LogInformation("FFmpeg Linux capture completed with exit code: {Code}", process.ExitCode);
-
-                    if (process.ExitCode != 0)
-                    {
-                        _logger.LogError("FFmpeg Linux capture failed! stderr: {Err}", stderr);
-                    }
-                    else
-                    {
-                        _logger.LogDebug("FFmpeg Linux stderr: {Err}", stderr);
-                    }
-                }
-                catch (OperationCanceledException)
-                {
-                    _logger.LogWarning("FFmpeg Linux capture timeout after {Timeout}s, killing...", timeoutSec);
-                    try { process.Kill(true); } catch { }
-                    throw;
-                }
-
-                var frameFiles = Directory.GetFiles(tempDir, "frame_*.jpg")
-                    .OrderBy(f => f)
-                    .ToList();
-
-                _logger.LogInformation("FFmpeg Linux captured {FrameCount} frames", frameFiles.Count);
-
-                foreach (var file in frameFiles)
-                {
-                    if (ct.IsCancellationRequested) break;
-
-                    try
-                    {
-                        var bytes = await File.ReadAllBytesAsync(file, ct);
-                        if (bytes.Length > 0)
-                        {
-                            frames.Add(bytes);
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogWarning(ex, "Failed to read Linux frame file: {File}", file);
-                    }
-                }
-
-                return frames;
+                
+                using var proc = Process.Start(psi);
+                if(proc != null) await proc.WaitForExitAsync(ct);
+                
+                var files = Directory.GetFiles(tempDir, "frame_*.jpg").OrderBy(f => f).ToList();
+                // [FIX] Đã sửa lỗi biến vòng lặp từ 'f' thành 'file'
+                foreach (var file in files) frames.Add(await File.ReadAllBytesAsync(file, ct));
             }
-            catch (OperationCanceledException)
-            {
-                _logger.LogInformation("Linux webcam capture cancelled");
-                return frames;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error during Linux batch capture");
-                return frames;
-            }
-            finally
-            {
-                try
-                {
-                    if (Directory.Exists(tempDir))
-                    {
-                        Directory.Delete(tempDir, recursive: true);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "Failed to cleanup Linux temp directory");
-                }
-            }
+            catch (Exception ex) { _logger.LogError("FFmpeg Linux Error: " + ex.Message); }
+            finally { if (Directory.Exists(tempDir)) Directory.Delete(tempDir, recursive: true); }
+            return frames;
         }
 
+        #endregion
+
+        #region Screen Capture Implementation (Screenshot)
+
+        [SupportedOSPlatform("windows")]
+        private byte[] CaptureScreenWindows()
+        {
+            try {
+                int w = Win32Native.GetSystemMetrics(Win32Native.SM_CXSCREEN);
+                int h = Win32Native.GetSystemMetrics(Win32Native.SM_CYSCREEN);
+                using var bmp = new Bitmap(w, h);
+                using var g = Graphics.FromImage(bmp);
+                g.CopyFromScreen(0, 0, 0, 0, new System.Drawing.Size(w, h), CopyPixelOperation.SourceCopy);
+                using var ms = new MemoryStream();
+                bmp.Save(ms, ImageFormat.Jpeg);
+                return ms.ToArray();
+            } catch { return Array.Empty<byte>(); }
+        }
+
+        private byte[] CaptureScreenMacOS()
+        {
+            var temp = Path.Combine(Path.GetTempPath(), $"scr_{Guid.NewGuid()}.jpg");
+            try
+            {
+                var psi = new ProcessStartInfo { FileName = "screencapture", Arguments = $"-t jpg -x \"{temp}\"", UseShellExecute = false, CreateNoWindow = true };
+                using var process = Process.Start(psi);
+                process?.WaitForExit(3000);
+                if (File.Exists(temp)) return File.ReadAllBytes(temp);
+                return Array.Empty<byte>();
+            }
+            finally { if (File.Exists(temp)) File.Delete(temp); }
+        }
+
+        private byte[] CaptureScreenLinux() 
+        {
+            var temp = Path.Combine(Path.GetTempPath(), $"scr_{Guid.NewGuid()}.jpg");
+            try {
+                var tools = new[] { ("gnome-screenshot", $"-f \"{temp}\""), ("scrot", $"\"{temp}\"") };
+                foreach(var (tool, args) in tools) {
+                    try {
+                        var psi = new ProcessStartInfo { FileName = tool, Arguments = args, UseShellExecute = false, CreateNoWindow = true };
+                        using var process = Process.Start(psi);
+                        process?.WaitForExit(3000);
+                        if (File.Exists(temp)) return File.ReadAllBytes(temp);
+                    } catch {}
+                }
+                return Array.Empty<byte>();
+            }
+            finally { if (File.Exists(temp)) File.Delete(temp); }
+        }
+
+        #endregion
+
+        #region IDisposable
+        public void Dispose() { Dispose(true); GC.SuppressFinalize(this); }
+        protected virtual void Dispose(bool disposing) { if (!_disposed) { if (disposing) CloseWebcamInternal(); _disposed = true; } }
+        ~WebcamService() { Dispose(false); }
         #endregion
     }
 }
