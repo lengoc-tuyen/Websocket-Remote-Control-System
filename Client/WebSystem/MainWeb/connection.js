@@ -212,6 +212,12 @@ function wireActionButtons() {
         else if (!name) alert("Vui lòng nhập tên ứng dụng!");
     });
 
+    document.getElementById("startProcessBtn").addEventListener("click", () => {
+        const name = document.getElementById("processNameInput").value;
+        if (checkConn() && name) connection.invoke("StartProcess", name);
+        else if (!name) alert("Vui lòng nhập tên hoặc đường dẫn Process!");
+    });
+
     document.getElementById("stopSelectedAppBtn").addEventListener("click", () => {
         const id = getSelectedId("selectedApp");
         if (checkConn()) {

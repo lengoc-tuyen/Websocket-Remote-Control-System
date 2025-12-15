@@ -98,4 +98,3 @@ if (snowmanBubble) {
     showGreeting();
     setInterval(showGreeting, 5000);
 }
-

