@@ -9,8 +9,16 @@ using Microsoft.Extensions.Options;
 using Server.Configuration;
 using Server.helper; 
 
+
 // Luôn dùng OpenCvSharp
 using OpenCvSharp;
+
+// Thêm thư viện
+//using System.Drawing;
+//using System.Drawing.Imaging;
+using System.IO;
+using System.Linq;
+using System.Windows.Forms;
 
 namespace Server.Services
 {
@@ -475,19 +483,42 @@ namespace Server.Services
         #region Screen Capture Implementation (Screenshot)
 
         [SupportedOSPlatform("windows")]
+        // private byte[] CaptureScreenWindows()
+        // {
+        //     try {
+        //         int w = Win32Native.GetSystemMetrics(Win32Native.SM_CXSCREEN);
+        //         int h = Win32Native.GetSystemMetrics(Win32Native.SM_CYSCREEN);
+        //         using var bmp = new Bitmap(w, h);
+        //         using var g = Graphics.FromImage(bmp);
+        //         g.CopyFromScreen(0, 0, 0, 0, new System.Drawing.Size(w, h), CopyPixelOperation.SourceCopy);
+        //         using var ms = new MemoryStream();
+        //         bmp.Save(ms, ImageFormat.Jpeg);
+        //         return ms.ToArray();
+        //     } catch { return Array.Empty<byte>(); }
+        // }
+
         private byte[] CaptureScreenWindows()
-        {
-            try {
-                int w = Win32Native.GetSystemMetrics(Win32Native.SM_CXSCREEN);
-                int h = Win32Native.GetSystemMetrics(Win32Native.SM_CYSCREEN);
-                using var bmp = new Bitmap(w, h);
-                using var g = Graphics.FromImage(bmp);
-                g.CopyFromScreen(0, 0, 0, 0, new System.Drawing.Size(w, h), CopyPixelOperation.SourceCopy);
-                using var ms = new MemoryStream();
-                bmp.Save(ms, ImageFormat.Jpeg);
-                return ms.ToArray();
-            } catch { return Array.Empty<byte>(); }
-        }
+{
+    try
+    {
+        // Lấy toàn bộ vùng desktop (gồm mọi màn hình)
+        var bounds = SystemInformation.VirtualScreen; // X/Y có thể âm
+
+        using var bmp = new Bitmap(bounds.Width, bounds.Height, PixelFormat.Format24bppRgb);
+        using var g = Graphics.FromImage(bmp);
+
+        // Chụp bắt đầu từ tọa độ gốc thật của desktop (có thể âm)
+        g.CopyFromScreen(bounds.X, bounds.Y, 0, 0, bounds.Size, CopyPixelOperation.SourceCopy);
+
+        using var ms = new MemoryStream();
+        bmp.Save(ms, ImageFormat.Jpeg); // hoặc PNG nếu bạn muốn rõ chữ hơn
+        return ms.ToArray();
+    }
+    catch
+    {
+        return Array.Empty<byte>();
+    }
+}
 
         private byte[] CaptureScreenMacOS()
         {
