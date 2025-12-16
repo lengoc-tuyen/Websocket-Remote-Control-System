@@ -502,8 +502,6 @@ namespace Server.Services
         {
             try
             {
-                // ✅ Lấy toàn bộ desktop thật (mọi màn hình, kể cả tọa độ âm)
-                // Lấy kích thước màn hình bằng Win32 API thay vì SystemInformation
                 int w = Win32Native.GetSystemMetrics(Win32Native.SM_CXSCREEN);
                 int h = Win32Native.GetSystemMetrics(Win32Native.SM_CYSCREEN);
 

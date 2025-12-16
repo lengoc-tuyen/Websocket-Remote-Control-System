@@ -1,12 +1,18 @@
 {
   "version": 2,
-  "dgSpecHash": "hJbeeyFph+g=",
+  "dgSpecHash": "B8olq4Z28o0=",
   "success": true,
   "projectFilePath": "/Users/lengoctuyen/Documents/Allmyproject/Websocket-Remove-Control-System/Client/Client.csproj",
-  "expectedPackageFiles": [
-    "/Users/lengoctuyen/.nuget/packages/microsoft.netcore.app.ref/7.0.20/microsoft.netcore.app.ref.7.0.20.nupkg.sha512",
-    "/Users/lengoctuyen/.nuget/packages/microsoft.aspnetcore.app.ref/7.0.20/microsoft.aspnetcore.app.ref.7.0.20.nupkg.sha512",
-    "/Users/lengoctuyen/.nuget/packages/microsoft.netcore.app.host.osx-arm64/7.0.20/microsoft.netcore.app.host.osx-arm64.7.0.20.nupkg.sha512"
-  ],
-  "logs": []
+  "expectedPackageFiles": [],
+  "logs": [
+    {
+      "code": "Undefined",
+      "level": "Warning",
+      "message": "Problem reading the cache file /Users/lengoctuyen/Documents/Allmyproject/Websocket-Remove-Control-System/Client/obj/project.nuget.cache : '<' is an invalid start of a property name. Expected a '\"'. Path: $ | LineNumber: 2 | BytePositionInLine: 0.",
+      "projectPath": "/Users/lengoctuyen/Documents/Allmyproject/Websocket-Remove-Control-System/Client/Client.csproj",
+      "warningLevel": 1,
+      "filePath": "/Users/lengoctuyen/Documents/Allmyproject/Websocket-Remove-Control-System/Client/Client.csproj",
+      "targetGraphs": []
+    }
+  ]
 }
