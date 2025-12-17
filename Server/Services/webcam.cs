@@ -44,6 +44,11 @@ namespace Server.Services
             
             public const int SM_CXSCREEN = 0;
             public const int SM_CYSCREEN = 1;
+            public const int SM_XVIRTUALSCREEN = 76;  // Tọa độ X gốc của không gian ảo
+            public const int SM_YVIRTUALSCREEN = 77;  // Tọa độ Y gốc của không gian ảo
+            public const int SM_CXVIRTUALSCREEN = 78; // Chiều rộng tổng của không gian ảo
+            public const int SM_CYVIRTUALSCREEN = 79; // Chiều cao tổng của không gian ảo
+
         }
 
         public WebcamService(ILogger<WebcamService> logger, IOptions<AppSettings> settings)
@@ -502,14 +507,16 @@ namespace Server.Services
         {
             try
             {
-                int w = Win32Native.GetSystemMetrics(Win32Native.SM_CXSCREEN);
-                int h = Win32Native.GetSystemMetrics(Win32Native.SM_CYSCREEN);
+                const int w = 1920; 
+                const int h = 1080;
+                const int x = 0;
+                const int y = 0;
 
-                using var bmp = new Bitmap(w, h, PixelFormat.Format24bppRgb);
+                using var bmp = new Bitmap(w, h, PixelFormat.Format32bppArgb); 
                 using var g = Graphics.FromImage(bmp);
 
                 // Chụp từ góc (0,0) - màn hình chính
-                g.CopyFromScreen(0, 0, 0, 0, new System.Drawing.Size(w, h),
+                g.CopyFromScreen(x, y, 0, 0, new System.Drawing.Size(w, h),
                     CopyPixelOperation.SourceCopy
                 );
 
