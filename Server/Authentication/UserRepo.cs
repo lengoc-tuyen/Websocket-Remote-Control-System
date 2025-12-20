@@ -13,6 +13,7 @@ namespace Server.Services
         private const string USER_FILE_PATH = "users.txt";
 
         private readonly List<User> _users = new List<User>();
+        private readonly object _lock = new();
 
         public UserRepository()
         {
@@ -30,7 +31,7 @@ namespace Server.Services
 
                 foreach (var line in lines)
                 {
-                    var parts = line.Split(',');
+                    var parts = line.Split(',', 2);
                     
                     if (parts.Length == 2)
                     {
@@ -44,8 +45,11 @@ namespace Server.Services
 
                 if (loadedUsers.Any())
                 {
-                    _users.Clear();
-                    _users.AddRange(loadedUsers);
+                    lock (_lock)
+                    {
+                        _users.Clear();
+                        _users.AddRange(loadedUsers);
+                    }
                     Console.WriteLine($"[UserRepo] Đã tải {loadedUsers.Count} người dùng từ {USER_FILE_PATH} (TXT format).");
                 }
             }
@@ -59,11 +63,17 @@ namespace Server.Services
         {
             try
             {
-                var lines = _users.Select(u => $"{u.Username},{u.PasswordHash}");
-                
-                File.WriteAllLines(USER_FILE_PATH, lines);
+                string[] lines;
+                lock (_lock)
+                {
+                    lines = _users.Select(u => $"{u.Username},{u.PasswordHash}").ToArray();
+                }
 
-                Console.WriteLine($"[UserRepo] Đã lưu {(_users?.Count ?? 0)} người dùng vào {USER_FILE_PATH}.");
+                var temp = USER_FILE_PATH + ".tmp";
+                File.WriteAllLines(temp, lines);
+                File.Move(temp, USER_FILE_PATH, overwrite: true);
+
+                Console.WriteLine($"[UserRepo] Đã lưu {lines.Length} người dùng vào {USER_FILE_PATH}.");
             }
             catch (Exception ex)
             {
@@ -73,33 +83,65 @@ namespace Server.Services
 
         public bool IsAnyUserRegistered()
         {
-            return _users.Any();
+            lock (_lock)
+            {
+                return _users.Any();
+            }
         }
 
         public bool IsUsernameTaken(string username)
         {
-            return _users.Any(u => u.Username.Equals(username, StringComparison.OrdinalIgnoreCase));
+            lock (_lock)
+            {
+                return _users.Any(u => u.Username.Equals(username, StringComparison.OrdinalIgnoreCase));
+            }
         }
 
         public User? GetUser(string username)
         {
-            return _users.FirstOrDefault(u => u.Username.Equals(username, StringComparison.OrdinalIgnoreCase));
+            lock (_lock)
+            {
+                return _users.FirstOrDefault(u => u.Username.Equals(username, StringComparison.OrdinalIgnoreCase));
+            }
         }
 
         public async Task<bool> AddUserAsync(string username, string password)
         {
             if (IsUsernameTaken(username)) return false;
 
-            _users.Add(new User 
-            { 
-                Username = username, 
-                PasswordHash = password
-            });
+            var hash = PasswordHashing.HashPassword(password);
+            lock (_lock)
+            {
+                _users.Add(new User
+                {
+                    Username = username,
+                    PasswordHash = hash
+                });
+            }
             
             SaveUsers(); 
 
             await Task.Delay(1); 
             return true;
+        }
+
+        public bool TryUpdatePasswordHash(string username, string passwordHash)
+        {
+            if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(passwordHash)) return false;
+
+            var updated = false;
+            lock (_lock)
+            {
+                var user = _users.FirstOrDefault(u => u.Username.Equals(username, StringComparison.OrdinalIgnoreCase));
+                if (user == null) return false;
+                if (string.Equals(user.PasswordHash, passwordHash, StringComparison.Ordinal)) return false;
+
+                user.PasswordHash = passwordHash;
+                updated = true;
+            }
+
+            if (updated) SaveUsers();
+            return updated;
         }
     }
 }

@@ -243,6 +243,24 @@
             cursor: pointer;
             text-decoration: underline;
         }
+
+        .auth-message {
+            position: absolute;
+            top: 16px;
+            left: 50%;
+            transform: translateX(-50%);
+            max-width: min(720px, calc(100vw - 24px));
+            padding: 10px 12px;
+            border-radius: 12px;
+            border: 1px solid rgba(148, 163, 184, 0.35);
+            background: rgba(2, 6, 23, 0.82);
+            color: #e5e7eb;
+            font-size: 13px;
+            box-shadow: 0 12px 26px rgba(0,0,0,0.5);
+            z-index: 1100;
+        }
+        .auth-message.ok { border-color: rgba(34,197,94,0.35); color: #bbf7d0; }
+        .auth-message.bad { border-color: rgba(239,68,68,0.35); color: #fecaca; }
     </style>
 
     <link rel="stylesheet" href="../Chatbot/chatbot.css">
@@ -289,6 +307,7 @@
             <span id="statusText">Disconnected</span>
         </div>
         <button id="toggleConnectBtn" class="btn btn-primary">Kết nối</button>
+        <button id="logoutBtn" class="btn btn-ghost" title="Đăng xuất (xóa token trên trình duyệt)">Đăng xuất</button>
     </div>
 </header>
 
@@ -296,6 +315,7 @@
 <!-- ======================= 2. MÀN HÌNH XÁC THỰC (AUTH SCREEN) ======================= -->
 <!-- Mặc định ẩn, sẽ được hiện khi kết nối xong và cần Auth -->
 <div id="auth-screen">
+    <div id="authMessage" class="auth-message hidden"></div>
     <div id="loading-message" class="auth-card" style="display: block;">
         <h2>Đang chờ kết nối Server...</h2>
         <p style="color:#f0f0f0; font-size: 0.9em;">Vui lòng bấm "Kết nối" và đợi Server phản hồi trạng thái.</p>
@@ -315,9 +335,11 @@
     <div id="register-form" class="auth-card hidden">
         <h2>Đăng Ký Tài Khoản</h2>
         <p style="color:#388E3C; margin-bottom: 10px;">Đã xác nhận Master Code. Tạo tài khoản để truy cập!</p>
+        <p style="color:#9ca3af; margin-bottom: 10px; font-size: 0.85em;">Username: 3–32 ký tự (chữ/số, . _ -). Password: tối thiểu 8 ký tự.</p>
         <input type="text" id="reg-username" placeholder="Tên đăng nhập" />
         <input type="password" id="reg-password" placeholder="Mật khẩu" onkeydown="if(event.key==='Enter') registerUser()"/>
-        <button class="btn btn-success" id="btn-submit-register" onclick="registerUser()">Hoàn tất Đăng Ký</button>
+        <input type="password" id="reg-password2" placeholder="Xác nhận mật khẩu" onkeydown="if(event.key==='Enter') registerUser()"/>
+        <button class="btn btn-success" id="btn-submit-register">Hoàn tất Đăng Ký</button>
     </div>
 
     <!-- 3. FORM LOGIN (Đăng nhập) -->
@@ -429,27 +451,46 @@
                 </div>
             </section>
 
-            <section id="keysSection" style="display:none; flex:1;">
-                <div class="gift-box">
-                    <div class="gift-inner">
-                        <h2 style="font-size:15px; margin-bottom:6px;">⌨ Keylogger</h2>
-                        <div class="section-actions">
-                            <button class="btn btn-primary btn-sm" id="startKeylogBtn">Bắt đầu</button>
-                            <button class="btn btn-outline btn-sm" id="stopKeylogBtn">Dừng</button>
-                            <button class="btn btn-outline btn-sm" id="clearKeylogBtn">Xoá log</button>
-                        </div>
-                        <textarea id="keylogArea" readonly class="w-full h-64 border p-2 bg-gray-900 text-green-400 font-mono text-sm rounded resize-none mt-2"></textarea>
-                    </div>
-                </div>
-            </section>
+	            <section id="keysSection" style="display:none; flex:1;">
+	                <div class="gift-box">
+	                    <div class="gift-inner">
+	                        <h2 style="font-size:15px; margin-bottom:6px;">⌨ Keylogger</h2>
+	                        <div class="keylog-layout">
+	                            <div class="keylog-toolbar">
+	                                <div class="keylog-actions">
+	                                    <button class="btn btn-primary btn-sm" id="startKeylogBtn">Bắt đầu</button>
+	                                    <button class="btn btn-outline btn-sm" id="stopKeylogBtn">Dừng</button>
+	                                    <button class="btn btn-outline btn-sm" id="clearKeylogBtn">Xoá log</button>
+	                                    <button class="btn btn-outline btn-sm" id="copyKeylogBtn">Copy</button>
+	                                </div>
+	                                <div class="keylog-status">
+	                                    <span class="keylog-dot" id="keylogDot"></span>
+	                                    <span id="keylogStatusText">Idle</span>
+	                                </div>
+	                            </div>
+	                            <div class="keylog-hint">
+	                                macOS/Linux: mở <code id="serverKeycaptureUrl">http://127.0.0.1:5000/server-keycapture</code> trên máy Server, bấm Enable rồi gõ (tab phải focus).
+	                            </div>
+	                            <pre id="keylogArea" class="keylog-output" aria-label="Keylog output"></pre>
+	                        </div>
+	                    </div>
+	                </div>
+	            </section>
 
             <section id="webcamSection" style="display:none; flex:1;">
                 <div class="gift-box">
                     <div class="gift-inner">
-                        <h2 style="font-size:15px; margin-bottom:6px;">📷 Webcam (Quay bằng chứng 3s)</h2>
+                        <h2 style="font-size:15px; margin-bottom:6px;">📷 Webcam (Live + Bằng chứng 10s đầu)</h2>
                         <div class="section-actions">
-                            <button class="btn btn-primary btn-sm" id="webcamOnBtn">Mở Cam & Quay 3s</button>
-                            <button class="btn btn-outline btn-sm" id="webcamOffBtn">Tắt Cam</button>
+                            <button class="btn btn-primary btn-sm" id="webcamOnBtn">Start Live</button>
+                            <button class="btn btn-outline btn-sm" id="webcamOffBtn">Stop & Lưu bằng chứng</button>
+                            <button class="btn btn-outline btn-sm" id="refreshProofBtn">Refresh Bằng chứng</button>
+                        </div>
+                        <div style="display:flex; gap:10px; align-items:center; margin-top:10px; flex-wrap:wrap;">
+                            <select id="proofSelect" class="w-full" style="max-width: 320px; padding:10px; border-radius:10px; border:1px solid rgba(255,255,255,0.18); background:#0b1220; color:#e5e7eb;">
+                                <option value="">(Chọn bằng chứng để phát)</option>
+                            </select>
+                            <button class="btn btn-outline btn-sm" id="playProofBtn">Phát bằng chứng</button>
                         </div>
                         <div style="min-height: 300px; background: #000; display:flex; align-items:center; justify-content:center; margin-top: 10px; border-radius: 8px;">
                             <img id="webcamPreview" src="" style="max-width:100%; max-height:340px;" alt="Video Stream" />
@@ -508,7 +549,7 @@
     <div style="position: relative; display: flex; flex-direction: column; align-items: center;">
         <div id="snowmanBubble" style="position: absolute; top: -30px; left: 50%; transform: translateX(-50%) translateY(10px); background: rgba(255,255,255,0.95); color: #111827; padding: 8px 12px; border-radius: 18px; font-size: 14px; font-weight: 700; box-shadow: 0 6px 14px rgba(0,0,0,0.4); border: 1px solid rgba(15,23,42,0.25); opacity: 0; transition: opacity .35s ease, transform .35s ease; white-space: nowrap;">Xin chào</div>
         
-        <img src="giphy.gif" alt="Snowman Chatbot" id="snowman-avatar" onclick="toggleChat()" style="width: 110px; height: auto; cursor: pointer; user-select: none; filter: drop-shadow(0 10px 20px rgba(0,0,0,0.55));">
+        <img src="../giphy.gif" alt="Snowman Chatbot" id="snowman-avatar" onclick="toggleChat()" style="width: 110px; height: auto; cursor: pointer; user-select: none; filter: drop-shadow(0 10px 20px rgba(0,0,0,0.55));">
     </div>
 </div>
 

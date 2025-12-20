@@ -45,10 +45,6 @@
         "net10.0": {
           "targetAlias": "net10.0",
           "dependencies": {
-            "Microsoft.Win32.Registry": {
-              "target": "Package",
-              "version": "[5.0.0, )"
-            },
             "OpenCvSharp4": {
               "target": "Package",
               "version": "[4.9.0.20240103, )"

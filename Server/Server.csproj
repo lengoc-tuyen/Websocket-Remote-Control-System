@@ -19,6 +19,12 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Nếu dùng dotnet watch, đừng restart khi proof file thay đổi -->
+    <Watch Remove="ServerData/**" />
+    <Watch Remove="users.txt" />
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- Gói đồ họa -->
     <PackageReference Include="System.Drawing.Common" Version="10.0.0" />
 
@@ -30,8 +36,6 @@
     <PackageReference Include="OpenCvSharp4.runtime.win" Version="4.9.0.20240103" />
     <!-- Lưu ý: Trên macOS cần cài: brew install opencv -->
 
-    <!-- Gói Registry -->
-    <PackageReference Include="Microsoft.Win32.Registry" Version="5.0.0" />
   </ItemGroup>
 
 </Project>

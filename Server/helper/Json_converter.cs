@@ -19,7 +19,8 @@ namespace Server.helper
 
         public static T FromJson<T>(string json)
         {
-            return JsonSerializer.Deserialize<T>(json, _options);
+            return JsonSerializer.Deserialize<T>(json, _options) ??
+                   throw new JsonException("Invalid JSON payload.");
         }
     }
 }

@@ -186,6 +186,58 @@ namespace Server.Services
             }
         }
 
+        public async Task RunLiveWebcam(int fps, CancellationToken ct, Func<byte[], CancellationToken, Task> onFrame)
+        {
+            fps = Math.Clamp(fps, 1, 30);
+
+            // macOS/Linux: use FFmpeg pipeline (no OpenCvSharp native dependency).
+            if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            {
+                try
+                {
+                    var reader = StreamWebcamFramesFfmpegLatest(fps, ct);
+                    await foreach (var frame in reader.ReadAllAsync(ct))
+                    {
+                        if (frame is { Length: > 0 })
+                            await onFrame(frame, ct);
+                    }
+                    await reader.Completion;
+                }
+                catch (OperationCanceledException)
+                {
+                    // ignore
+                }
+                return;
+            }
+
+            var delayMs = (int)Math.Round(1000.0 / fps);
+
+            if (!OpenWebcamInternal()) return;
+
+            try
+            {
+                while (!ct.IsCancellationRequested)
+                {
+                    var frame = CaptureFrame();
+
+                    if (frame is { Length: > 0 })
+                    {
+                        await onFrame(frame, ct);
+                    }
+
+                    await Task.Delay(delayMs, ct);
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                // ignore
+            }
+            finally
+            {
+                CloseWebcamInternal();
+            }
+        }
+
         #endregion
 
         #region Webcam Implementation (OpenCV Logic)
@@ -349,6 +401,14 @@ namespace Server.Services
                 }
                 catch (Exception ex)
                 {
+                    if (ct.IsCancellationRequested || ex is OperationCanceledException)
+                    {
+                        _logger.LogInformation("FFmpeg stream stopped.");
+                        writer.TryComplete();
+                        try { if (!process.HasExited) process.Kill(); } catch {}
+                        return;
+                    }
+
                     _logger.LogError("Lỗi luồng FFmpeg: " + ex.Message);
                     try { if (!process.HasExited) process.Kill(); } catch {}
                 }

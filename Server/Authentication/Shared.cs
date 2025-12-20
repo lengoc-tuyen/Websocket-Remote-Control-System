@@ -23,7 +23,11 @@ namespace Server.Shared
     public static class ErrorMessages
     {
         public const string SetupCodeInvalid = "Mã Master Code không đúng.";
-        public const string RegistrationNotAllowed = "Chào mừng, bạn đã đăng ký thành công.";
+        public const string RegistrationNotAllowed = "Bạn cần nhập Master Code trước khi đăng ký tài khoản mới.";
+        public const string RegistrationExpired = "Phiên đăng ký đã hết hạn. Vui lòng nhập lại Master Code.";
+        public const string InvalidUsername = "Tên đăng nhập không hợp lệ (3–32 ký tự, chỉ chữ/số và . _ -).";
+        public const string InvalidPassword = "Mật khẩu không hợp lệ (tối thiểu 8 ký tự).";
+        public const string RegistrationFailed = "Đăng ký thất bại. Vui lòng thử lại.";
         public const string UsernameTaken = "Tên đăng nhập đã tồn tại.";
         public const string InvalidCredentials = "Tên đăng nhập hoặc mật khẩu không đúng.";
     }

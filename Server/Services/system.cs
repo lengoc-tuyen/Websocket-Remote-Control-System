@@ -5,6 +5,7 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using System.IO;
+using Microsoft.Extensions.Logging;
 using Server.helper;
 using static System.Runtime.InteropServices.RuntimeInformation;
 
@@ -12,6 +13,12 @@ namespace Server.Services
 {
     public class SystemService
     {
+        private readonly ILogger<SystemService> _logger;
+
+        public SystemService(ILogger<SystemService> logger)
+        {
+            _logger = logger;
+        }
 
         // hàm này liệt kê tiến trình hoặc app (2 hàm kế ở dưới hỗ trợ)
         public List<ProcessInfo> ListProcessOrApp(bool isAppOnly = false)
@@ -135,7 +142,7 @@ namespace Server.Services
 
             if (Process.GetProcessesByName(baseName).Length > 0)
             {
-                Console.WriteLine($"Process {processPath} is already running. Skipping new instance.");
+                _logger.LogWarning("Process already running: {ProcessPath}", processPath);
                 return false; 
             }
             
@@ -156,7 +163,7 @@ namespace Server.Services
                     }
                     catch (Exception innerEx)
                     {
-                        Console.WriteLine($"Error starting process {processPath}.exe: {innerEx.Message}");
+                        _logger.LogError(innerEx, "Error starting process {ProcessPath}.exe", processPath);
                     }
                 }
                 else if (IsOSPlatform(OSPlatform.OSX))
@@ -169,11 +176,11 @@ namespace Server.Services
                     }
                     catch(Exception innerEx)
                     {
-                        Console.WriteLine($"Error starting process {processPath} on OSX: {innerEx.Message}");
+                        _logger.LogError(innerEx, "Error starting process {ProcessPath} on macOS", processPath);
                     }
                 }
                 
-                Console.WriteLine($"Error starting process {processPath}: {ex.Message}");
+                _logger.LogError(ex, "Error starting process {ProcessPath}", processPath);
                 return false;
             }
         }
@@ -230,7 +237,7 @@ namespace Server.Services
                 }
                 else
                 {
-                    Console.WriteLine("Shutdown command not implemented for this OS.");
+                    _logger.LogWarning("Shutdown command not implemented for this OS.");
                     return false;
                 }
 
@@ -239,11 +246,11 @@ namespace Server.Services
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error executing power command: {ex.Message}");
+                _logger.LogError(ex, "Error executing power command");
                 return false;
             }
         }
 
 
     }
-};
+}
