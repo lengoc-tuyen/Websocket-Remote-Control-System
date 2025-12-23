@@ -1,19 +1,41 @@
 /* (Giữ nguyên toàn bộ CSS đẹp của bạn) */
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
-body {
+/* body {
     font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
     background: linear-gradient(160deg, #052e16, #020617 55%);
     color: #f9fafb;
     height: 100vh;
     display: flex;
     flex-direction: column;
+} */
+
+body {
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+
+    background-image:
+        linear-gradient(
+            rgba(2, 6, 23, 0.65),
+            rgba(2, 6, 23, 0.85)
+        ),
+        url("../image/main-bg.jpg");
+
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    background-attachment: fixed;
+
+    color: #f9fafb;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
 }
+
 
 header {
     background: #064e3b;
     color: #f9fafb;
-    padding: 30px 40px;
+    padding: 12px 40px;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -69,11 +91,11 @@ header {
     font-weight: 600;
 }
 
-.btn-primary { background: #f97316; color: #111827; }
+.btn-primary { background: #e86a6a; color: #111827; }
 .btn-outline { background: transparent; color: #e5e7eb; border: 1px solid rgba(148, 163, 184, 0.7); text-decoration: none; }
 .btn-sm { padding: 5px 10px; font-size: 12px; }
-.btn-danger { background: #ef4444; color: #fef2f2; }
-.btn-warning { background: #facc15; color: #451a03; }
+.btn-danger { background: #ef4444; color: #232020; }
+.btn-warning { background: #377d1e; color: #f7f1ed; }
 
 .btn-ghost { background: rgba(2, 6, 23, 0.65); color: #e5e7eb; border: 1px solid rgba(148, 163, 184, 0.6); }
 .btn-ghost:hover { background: rgba(2, 6, 23, 0.8); }
@@ -89,10 +111,10 @@ main { flex: 1; padding: 12px 14px; display: flex; flex-direction: column; gap: 
 .tabs { display: flex; flex-wrap: wrap; gap: 6px; border-bottom: 1px solid rgba(148,163,184,0.4); margin-top: 6px; padding-left: 2px; }
 .tab-btn { position: relative; background: transparent; border: none; cursor: pointer; padding: 7px 14px; font-size: 14px; font-weight: 500; color: #e5e7eb; transition: 0.25s; z-index: 2; display: flex; align-items: center; gap: 6px; }
 .tab-btn.active { color: #522b10; font-weight: 700; }
-.tab-btn.active::before { content: ""; position: absolute; top: -4px; left: 50%; transform: translateX(-50%); width: calc(100% + 22px); height: 44px; border-radius: 14px 14px 0 0; background: linear-gradient(135deg, #fecaca, #fed7aa); border: 2px solid #f97316; box-shadow: 0 6px 16px rgba(0,0,0,0.45); z-index: -1; }
+.tab-btn.active::before { content: ""; position: absolute; top: -4px; left: 50%; transform: translateX(-50%); width: calc(100% + 22px); height: 44px; border-radius: 14px 14px 0 0; background: #fac7c7; border: 2px solid #ab2d2d; box-shadow: 0 6px 16px rgba(0,0,0,0.45); z-index: -1; }
 
 .tab-content { flex: 1; margin-top: -1px; overflow: auto; font-size: 14px; display: flex; }
-.gift-box { position: relative; margin-top: 12px; margin-bottom: 10px; flex: 1; border-radius: 18px; background: linear-gradient(135deg, #fecaca, #fed7aa); padding: 14px 14px 18px; box-shadow: 0 18px 35px rgba(0,0,0,0.6); border: 2px solid #f97316; overflow: hidden; }
+.gift-box { position: relative; margin-top: 12px; margin-bottom: 10px; flex: 1; border-radius: 18px; background: linear-gradient(135deg, #fecaca, #fed7aa); padding: 14px 14px 18px; box-shadow: 0 18px 35px rgba(0,0,0,0.6); border: 2px solid #ab2d2d; overflow: hidden; }
 .gift-inner { position: relative; z-index: 1; background: rgba(15, 23, 42, 0.96); border-radius: 14px; padding: 12px; border: 1px solid rgba(15,23,42,0.9); color: #e5e7eb; height: 100%; overflow-y: auto;}
 
 .section-actions { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 8px; }
@@ -412,6 +434,102 @@ th { background: #020617; }
   transform: translateY(10px) !important;
 }
 
+/* ===== Make panels transparent to see background ===== */
+.gift-box{
+  background: rgba(255, 189, 145, 0.22) !important;  /* trong hơn */
+  box-shadow: 0 18px 35px rgba(0,0,0,0.45) !important;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+.gift-inner{
+  background: rgba(15, 23, 42, 0.55) !important;  /* giảm từ 0.96 -> 0.55 */
+  border: 1px solid rgba(255,255,255,0.12) !important;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+/* ===== TABLE TRANSPARENT (HEADER + ROW) ===== */
+table{
+  background: transparent !important;
+}
+
+th{
+  background: rgba(2, 6, 23, 0.45) !important;   /* header trong */
+}
+
+td{
+  background: rgba(2, 6, 23, 0.18);              /* row trong */
+}
+
+tr:hover td{
+  background: rgba(255, 255, 255, 0.06);
+}
+
+/* ❄️ Snow layer chỉ cho màn Auth */
+#auth-screen { 
+  position: fixed; 
+  inset: 0; 
+  overflow: hidden;
+}
+
+#auth-snow-layer{
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1; /* tuyết */
+}
+
+/* Card auth phải nằm trên tuyết */
+#auth-screen .auth-card{
+  position: relative;
+  z-index: 2;
+}
 
 
+/* ====== Bow (Nơ) giống main.html ====== */
+.bow-center, .bow-left, .bow-right {
+  display: none;
+}
 
+.tab-btn.active .bow-center {
+  display: block;
+  position: absolute;
+  top: -14px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 32px;
+  height: 18px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #b91c1c, #7f1d1d);
+  box-shadow: 0 3px 6px rgba(0,0,0,0.4);
+  z-index: 3;
+}
+
+.tab-btn.active .bow-left {
+  display: block;
+  position: absolute;
+  top: -8px;
+  left: calc(50% - 34px);
+  width: 26px;
+  height: 16px;
+  border-radius: 8px;
+  transform: rotate(-22deg);
+  background: linear-gradient(135deg, #dc2626, #7f1d1d);
+  box-shadow: 0 3px 5px rgba(0,0,0,0.4);
+  z-index: 2;
+}
+
+.tab-btn.active .bow-right {
+  display: block;
+  position: absolute;
+  top: -8px;
+  left: calc(50% + 8px);
+  width: 26px;
+  height: 16px;
+  border-radius: 8px;
+  transform: rotate(22deg);
+  background: linear-gradient(135deg, #dc2626, #7f1d1d);
+  box-shadow: 0 3px 5px rgba(0,0,0,0.4);
+  z-index: 2;
+}
